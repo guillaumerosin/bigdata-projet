@@ -12,7 +12,7 @@ from hdfs import InsecureClient
 
 def load_gcam_mapping():  # 1 usage
     conn = mysql.connector.connect(
-        host="172.20.0.210",
+        host="172.20.0.210:3306",
         user="root",
         password="wTwF0UQRqL4it4j",
         database="test"
