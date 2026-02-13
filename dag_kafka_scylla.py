@@ -10,6 +10,39 @@ from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy
 # Initialiser le logger
 log = logging.getLogger(__name__)
 
+# Mapping GCAM basé sur la structure GDELT
+# Format: "code": "Dimension lisible"
+GCAM_MAPPING = {
+    'wc': 'WordCount',
+    'c1.1': 'Positive',
+    'c1.2': 'Negative',
+    'c2.1': 'Strong',
+    'c2.2': 'Weak',
+    'c2.3': 'Submissive',
+    'c2.4': 'Hostile',
+    'c2.5': 'Active',
+    'c2.6': 'Passive',
+    'c2.7': 'Sure',
+    'c2.8': 'Undet',
+    'c12.1': 'Anxiety',
+    'c12.2': 'Anger',
+    'c12.3': 'Sadness',
+    'c12.4': 'Joy',
+    'c12.5': 'Fear',
+    'c12.6': 'Disgust',
+    'c12.7': 'Surprise',
+    'c12.8': 'Trust',
+    'c12.9': 'Anticipation',
+    'c12.10': 'Polarity',
+    'c12.11': 'Positivity',
+    'c12.12': 'Negativity',
+    'c10.1': 'BodyParts',
+    'c10.2': 'Health',
+    'c10.3': 'Sexual',
+    'c10.4': 'Ingestion'
+}
+
+
 def parse_sourceType(source_type):
     if (source_type):
         match source_type:
@@ -67,29 +100,36 @@ def parse_tone_dict(tone_str):
         return None
 
 
-# Mapping GCAM chargé depuis un fichier ou dict statique
-# Remplace load_gcam_mapping() par un dict ou fichier JSON
-GCAM_MAPPING = {}  # À remplir avec ton mapping
-
-
 def enrich_gcam_text(codes_string):
+    """
+    Transforme les codes GCAM en format lisible
+    Exemple: "wc:2784,c1.1:1,c1.2:6" -> {"WordCount": 2784, "Positive": 1, "Negative": 6}
+    """
     try:
+        # Séparer les codes par virgule
         codes = codes_string.split(",")
-        parsed_codes = [
-            (key.strip(), float(val.strip()))
-            for code in codes if ":" in code
-            for key, val in [code.split(":")]
-            if val.replace('.', '', 1).isdigit()
-        ]
-
+        parsed_codes = []
+        
+        for code in codes:
+            if ":" in code:
+                parts = code.split(":")
+                key = parts[0].strip()
+                val = parts[1].strip()
+                
+                # Vérifier que la valeur est numérique
+                if val.replace('.', '', 1).replace('-', '', 1).isdigit():
+                    parsed_codes.append((key, float(val)))
+        
+        # Trier par valeur décroissante et garder les 20 premiers
         top_20 = sorted(parsed_codes, key=lambda x: x[1], reverse=True)[:20]
-
+        
+        # Remplacer les codes par leurs noms lisibles
         readable_dict = {
             GCAM_MAPPING.get(k, k): v for k, v in top_20
         }
-
+        
         return readable_dict
-
+    
     except Exception as e:
         log.error(f"Erreur enrich gcam text: {e}")
         return {}
@@ -134,7 +174,7 @@ def consume_kafka_messages(max_messages=10):
                         "organizations": parts[13].split(";"),
                         "tone": parse_tone_dict(parts[15]),
                         "dates_in_text": parts[16],
-                        "gcam": enrich_gcam_text(parts[17]),
+                        "gcam": enrich_gcam_text(parts[17]),  # Enrichissement GCAM
                         "sharing_image": parts[18],
                         "videos": parse_videos(parts[21]),
                         "numerical_values": parts[24],
@@ -161,7 +201,6 @@ def consume_kafka_messages(max_messages=10):
 
 def write_to_Scylla(article):
     try:
-        # Connexion à Scylla avec les 3 nœuds
         compte = PlainTextAuthProvider(
             username='user_kawasaki', 
             password='WtWF0UQRqL4it4j'
@@ -229,3 +268,4 @@ python_task = PythonOperator(
     python_callable=consume_kafka_messages,
     dag=dag
 )
+
