@@ -212,7 +212,7 @@ def write_to_Scylla(article):
             auth_provider=compte
         )
 
-        session = cluster.connect('test')
+        session = cluster.connect('my_keyspace')
 
         query = """
             INSERT INTO articlefulltexttest (
