@@ -22,7 +22,7 @@ def consume_data():  # 1 usage
         bootstrap_servers=['172.20.0.51:9092'],
         auto_offset_reset='earliest',
         group_id='airflow-hdfs',
-        enable_auto_commit=True,
+        enable_auto_commit=False, #on commit pas les messages, on les commit manuellement
         consumer_timeout_ms=5000  # après 5s sans nouveau messages ma boucle se termine
     )
 
@@ -34,10 +34,13 @@ def consume_data():  # 1 usage
             key, values = article_data.split('\t', 1)
             key = key.strip()
             # values = values.strip()
-            hdfs_file_path = f"{hdfs_base_path}{key}.txt"  # Création du chemin (chemin de base + id article)
+            ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
+            hdfs_file_path = f"{hdfs_base_path}{key}_{ts}.txt" #on ajoute le timestamp pour eviter les doublons
 
             with client.write(hdfs_file_path) as writer:
                 writer.write(article_data)
+
+            consumer.commit() #on commit le message
 
         else:
             print(f" mauvais format pour le message : {article_data}")
