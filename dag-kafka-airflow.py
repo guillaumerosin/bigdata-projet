@@ -9,8 +9,8 @@ my_dag = DAG(
     dag_id="a_PutToHadoop",
     description="Consommer les msg du topic kafka et les envoyer vers hadoop",
     schedule_interval=None, #déclenchement manuel
-    start_date=datetime.datetime(year=2025, month=2, day=28),
-    catchup=False, #ne pas exec des taches passées
+    start_date=datetime.datetime(year=2026, month=2, day=15),
+    catchup=False, #n'execute pas les taches passées
 )
 
 def consume_data():  # 1 usage
