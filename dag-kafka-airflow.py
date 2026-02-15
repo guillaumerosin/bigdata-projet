@@ -21,9 +21,9 @@ def consume_data():  # 1 usage
         'test',
         bootstrap_servers=['172.20.0.51:9092'],
         auto_offset_reset='earliest',
-        # group_id='airflowConsumer',
+        group_id='airflow-hdfs',
         enable_auto_commit=True,
-        consumer_timeout_ms=5000  # arreter de lire apres 5s si plus de msg
+        consumer_timeout_ms=5000  # après 5s sans nouveau messages ma boucle se termine
     )
 
     for message in consumer:
