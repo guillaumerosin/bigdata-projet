@@ -14,8 +14,8 @@ my_dag = DAG(
 )
 
 def consume_data():  # 1 usage
-    client = InsecureClient('http://172.20.0.190:9870')
-    fichier = 'opt/airflow/dags/a_PutToHadoop.txt'
+    client = InsecureClient('http://172.20.0.190:9870') #Pour parler à notre Namemode et insecure car pas d'authentification Kerberos
+    # fichier = 'opt/airflow/dags/a_PutToHadoop.txt'
     hdfs_base_path = "/user/hadoop/"  # chemin dossier auquel on va rajouter le nom du fichier en prenant l'id de l'article
     consumer = KafkaConsumer(
         'test',
