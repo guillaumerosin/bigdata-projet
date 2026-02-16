@@ -54,6 +54,7 @@ def parse_source_type(source_type: str | None):
         '6': "NONTEXTUALSOURCE",
     }.get(source_type)
 
+
 def parse_v1_theme(v1_theme: str | None):
     if not v1_theme:
         return []
@@ -146,8 +147,8 @@ def consume_kafka_to_scylla(max_messages: int = 10000):
         topic,
         bootstrap_servers=brokers,
         auto_offset_reset="earliest",     # OK: uniquement pour le tout premier run du groupe
-        group_id=group_id,               # ✅ “non encore analysés” = offsets par groupe
-        enable_auto_commit=False,         # ✅ commit après insertion Scylla
+        group_id=group_id,               
+        enable_auto_commit=False,         
         consumer_timeout_ms=5000,
     )
 
