@@ -22,8 +22,9 @@ def write_to_cassandra():
         VALUES (%s, %s)
     """
     values = (3, 'couilles de renard')
-    session.execute(query)
-    cluster.shutdown()
+    session.execute(query, values)
+
+    print("Données insérées dans Cassandra")
 
 # Créer le DAG
 dag = DAG('exemple_cassandra', description='A simple tutorial DAG',
