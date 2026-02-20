@@ -31,3 +31,9 @@ dag = DAG('exemple_cassandra', description='A simple tutorial DAG',
     schedule_interval=None,
     start_date=datetime(2026, 2, 18),
     catchup=False)
+
+task_write = PythonOperator(
+    task_id='write_to_cassandra_task',
+    python_callable=write_to_cassandra,
+    dag=dag,
+)
