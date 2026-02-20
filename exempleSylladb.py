@@ -9,7 +9,7 @@ def write_to_cassandra():
 
     KEYSPACE = "keyspace_pour_les_nuls"
 
-    # Auth
+    # Authentification 
     auth_provider = PlainTextAuthProvider(
         username="user_kawasaki",
         password="wTwF0UQRqL4it4j"
@@ -73,9 +73,31 @@ def write_to_cassandra():
     session.shutdown()
     cluster.shutdown()
 
+def kafka_to_scylladb():
+    from kafka import KafkaConsumer
+    from json 
+    from cassandra.cluster import Cluster
+    from cassandra.auth import PlainTextAuthProvider
+
+    # Kafka
+    consumer = KafkaConsumer(
+        'test',
+        bootstrap_servers=['172.20.0.51:9092', '172.20.0.52:9092'],
+        auto_offset_reset='latest',
+        enable_auto_commit=True,
+        group_id='a_airflow-group',
+        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+    )
+
+   message = next(consumer)
+   data = message.value
+   print("Info recue de Kafka : ", data)
+
+
+
 
 dag = DAG(
-    'exemple_cassandra',
+    'a_exemple_cassandra',
     description='A simple tutorial DAG',
     schedule_interval=None,
     start_date=datetime(2026, 2, 18),
@@ -83,7 +105,7 @@ dag = DAG(
 )
 
 task_write = PythonOperator(
-    task_id='a_write_to_cassandra_task',
+    task_id='write_to_cassandra_task',
     python_callable=write_to_cassandra,
     dag=dag,
 )
