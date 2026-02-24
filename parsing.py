@@ -1,5 +1,42 @@
-# parsing de dinguerie
+from cassandra.cluster import Cluster
 
+cluster = Cluster(["127.0.0.1"])
+session = cluster.connect()
+
+session.execute("""
+CREATE KEYSPACE IF NOT EXISTS gdelt
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+""")
+
+session.set_keyspace("gdelt")
+
+session.execute("""
+CREATE TABLE IF NOT EXISTS articles (
+    id text PRIMARY KEY,
+    date text,
+    source_type int,
+    source text,
+    source_url text,
+    v1themes text,
+    v2themes text,
+    v1locations text,
+    v2locations text,
+    v1persons text,
+    v2persons text,
+    v1organizations text,
+    v2organizations text,
+    tone text,
+    image text,
+    videos text,
+    quotations text,
+    allnames text,
+    extraxml text
+);
+""")
+
+print("Table créée")
+
+# parsing de dinguerie
 #source_type --> a transformé en texte --> 1   // 1 à 6 cf. v2SOURCECOLLECTIONIDENTIFIER
 GKG_COLUMNS = [
     'id',           # [0]  20260223113000-0
