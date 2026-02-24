@@ -34,13 +34,10 @@ GKG_COLUMNS = [
 # si jamais les lignes v1Counts, v2.1counts, v1locations,v2persons,v2organisations,images(associées)
 # images(res.soc.), quotations, allnames, infotraduction
 
-
-line = open('20260224154500.gkg.csv').readline()
-parts = line.split('\t')
-
-print("on lit une ligne")
-print(f"Nombre de colonnes :{len(parts)}") #Nombre de colonnes?
-print()
+# --- ScyllaDB ---
+SCYLLA_CONTACT_POINTS = ['127.0.0.1']  # ou liste de nœuds du cluster
+KEYSPACE = 'gkg'
+TABLE_GKG = 'records'
 
 # True si la valeur est vide 
 def est_vide(value):
@@ -94,33 +91,123 @@ def parse_tone(raw):
             result[k] = None
     return result
 
-# construction du dict — on n'ajoute un champ QUE s'il est renseigné 
-row = dict(zip(GKG_COLUMNS, parts))
+def build_structured(parts):
+    """Construit le dict structuré à partir des colonnes brutes (une ligne GKG)."""
+    if len(parts) < len(GKG_COLUMNS):
+        return None
+    row = dict(zip(GKG_COLUMNS, parts))
+    structured = {}
+    if not est_vide(row['id']):
+        structured['id'] = row['id'].strip()
+    if not est_vide(row['date']):
+        structured['date'] = parse_date(row['date'])
+    if not est_vide(row['source']):
+        structured['source'] = row['source'].strip()
+    if not est_vide(row['source_url']):
+        structured['source_url'] = row['source_url'].strip()
+    if not est_vide(row['image']):
+        structured['image'] = row['image'].strip()
+    if not est_vide(row['source_type']):
+        structured['source_type'] = transformation_source_type(row['source_type'].strip()) or row['source_type'].strip()
+    themes = parse_liste(row['v1themes'])
+    persons = parse_liste(row['v1persons'])
+    orgs = parse_liste(row['v1organizations'])
+    tone = parse_tone(row['v1_5tone'])
+    if themes:
+        structured['themes'] = themes
+    if persons:
+        structured['persons'] = persons
+    if orgs:
+        structured['organizations'] = orgs
+    if tone:
+        structured['tone'] = tone
+    return structured
 
-structured = {}
 
-# Champs simples
-if not est_vide(row['id']):               structured['id']            = row['id'].strip()
-if not est_vide(row['date']):             structured['date']          = parse_date(row['date'])
-if not est_vide(row['source']):           structured['source']        = row['source'].strip()
-if not est_vide(row['source_url']): structured['source_url'] = row['source_url'].strip()
-if not est_vide(row['image']):      structured['image']      = row['image'].strip()
-if not est_vide(row['source_type']):      structured['source_type']   = row['source_type'].strip()
+def get_scylla_session():
+    """Connexion au cluster ScyllaDB et retourne une session."""
+    from cassandra.cluster import Cluster
+    cluster = Cluster(contact_points=SCYLLA_CONTACT_POINTS)
+    return cluster.connect()
 
-# Champs multi-valeurs — on n'ajoute que s'il y a vraiment des valeurs
-themes  = parse_liste(row['v1themes'])
-persons = parse_liste(row['v1persons'])
-orgs    = parse_liste(row['v1organizations'])
-tone    = parse_tone(row['v1_5tone'])
 
-if themes:   structured['themes']        = themes
-if persons:  structured['persons']       = persons
-if orgs:     structured['organizations'] = orgs
-if tone:     structured['tone']          = tone
+def ensure_schema(session):
+    """Crée le keyspace et la table s'ils n'existent pas."""
+    session.execute(f"""
+        CREATE KEYSPACE IF NOT EXISTS {KEYSPACE}
+        WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}
+    """)
+    session.set_keyspace(KEYSPACE)
+    session.execute(f"""
+        CREATE TABLE IF NOT EXISTS {TABLE_GKG} (
+            id text PRIMARY KEY,
+            date text,
+            source text,
+            source_url text,
+            source_type text,
+            image text,
+            themes list<text>,
+            persons list<text>,
+            organizations list<text>,
+            tone map<text, double>
+        )
+    """)
 
-# Affichage final 
-print("RÉSULTAT STRUCTURÉ")
-print(f"Champs renseignés: {len(structured)} ")
-print()
-for k, v in structured.items():
-    print(f"  {k:<16} : {v}")
+
+def insert_gkg(session, structured):
+    """Insère un enregistrement structuré dans la table ScyllaDB."""
+    if not structured or 'id' not in structured:
+        return False
+    tone_map = {k: v for k, v in structured.get('tone', {}).items() if v is not None}
+    session.execute(
+        f"""
+        INSERT INTO {TABLE_GKG} (
+            id, date, source, source_url, source_type, image,
+            themes, persons, organizations, tone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            structured['id'],
+            structured.get('date'),
+            structured.get('source'),
+            structured.get('source_url'),
+            structured.get('source_type'),
+            structured.get('image'),
+            structured.get('themes') or [],
+            structured.get('persons') or [],
+            structured.get('organizations') or [],
+            tone_map,
+        ),
+    )
+    return True
+
+
+# --- Script : lit une ligne, parse, affiche et exporte en ScyllaDB ---
+if __name__ == '__main__':
+    line = open('20260224154500.gkg.csv').readline()
+    parts = line.split('\t')
+
+    print("On lit une ligne")
+    print(f"Nombre de colonnes : {len(parts)}")
+    print()
+
+    structured = build_structured(parts)
+    if not structured:
+        print("Erreur: ligne invalide ou colonnes manquantes")
+        exit(1)
+
+    print("RÉSULTAT STRUCTURÉ")
+    print(f"Champs renseignés: {len(structured)}")
+    print()
+    for k, v in structured.items():
+        print(f"  {k:<16} : {v}")
+
+    print()
+    print("Export ScyllaDB...")
+    try:
+        session = get_scylla_session()
+        ensure_schema(session)
+        insert_gkg(session, structured)
+        print("Insertion OK.")
+    except Exception as e:
+        print(f"Erreur ScyllaDB: {e}")
