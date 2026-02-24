@@ -35,24 +35,42 @@ GKG_COLUMNS = [
 # images(res.soc.), quotations, allnames, infotraduction
 
 
-line = open('20260223113000.gkg.csv').readline()
+line = open('20260224154500.gkg.csv').readline()
 parts = line.split('\t')
 
 print("on lit une ligne")
 print(f"Nombre de colonnes :{len(parts)}") #Nombre de colonnes?
 print()
 
+# True si la valeur est vide 
 def est_vide(value):
-    """True si la valeur est vide ou //osef → on s'en fout, on ignore."""
     v = (value or '').strip()
-    return v == '' or v.lower() == '//osef'
+    return v == '' 
 
+#deuxieme colonne date YYYYMMDDHHmmss → string lisible.
 def parse_date(raw):
-    """'YYYYMMDDHHmmss' → string lisible."""
     raw = (raw or '').strip()
     if len(raw) < 14:
         return None
     return f"{raw[0:4]}-{raw[4:6]}-{raw[6:8]} {raw[8:10]}:{raw[10:12]}:{raw[12:14]}"
+
+# transformation de la source_type en texte
+def transformation_source_type(source_type):
+    if source_type == '1':
+        return 'WEB'
+    if source_type == '2':
+        return 'CITATIONONLY'
+    if source_type == '3':
+        return 'CORE'
+    if source_type == '4':
+        return 'DTIC'
+    if source_type == '5':
+        return 'JSTOR'
+    if source_type == '6':
+        return 'NONTEXTUALSOURCE'
+    if source_type == '7':
+        return 'OTHER'
+    return None
 
 def parse_liste(raw, separateur=';'):
     """Champ multi-valeurs → liste Python. Retourne [] si //osef."""
@@ -60,6 +78,7 @@ def parse_liste(raw, separateur=';'):
         return []
     return [x.strip() for x in raw.split(separateur) if x.strip()]
 
+# transformation de la v1_5tone en dict 
 def parse_tone(raw):
     """V1.5TONE : 7 valeurs séparées par virgules → dict. Retourne {} si //osef."""
     if est_vide(raw):
@@ -75,7 +94,7 @@ def parse_tone(raw):
             result[k] = None
     return result
 
-# ─── Construction du dict — on n'ajoute un champ QUE s'il est renseigné ──
+# construction du dict — on n'ajoute un champ QUE s'il est renseigné 
 row = dict(zip(GKG_COLUMNS, parts))
 
 structured = {}
@@ -99,9 +118,9 @@ if persons:  structured['persons']       = persons
 if orgs:     structured['organizations'] = orgs
 if tone:     structured['tone']          = tone
 
-# ─── Affichage final ──────────────────────────────────────────────────────
-print("=== RÉSULTAT STRUCTURÉ ===")
-print(f"  Champs renseignés : {len(structured)} (les //osef sont ignorés)")
+# Affichage final 
+print("RÉSULTAT STRUCTURÉ")
+print(f"Champs renseignés: {len(structured)} ")
 print()
 for k, v in structured.items():
     print(f"  {k:<16} : {v}")
