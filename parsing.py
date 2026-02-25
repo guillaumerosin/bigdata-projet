@@ -13,8 +13,8 @@ session.set_keyspace("gdelt")
 session.execute("""
 CREATE TABLE IF NOT EXISTS articles (
     id text PRIMARY KEY,
-    date text,
-    source_type int,
+    date timestamp,
+    source_type text,
     source text,
     source_url text,
     v1themes text,
@@ -23,9 +23,9 @@ CREATE TABLE IF NOT EXISTS articles (
     v2locations text,
     v1persons text,
     v2persons text,
-    v1organizations text,
+    v1organizations list<text>,
     v2organizations text,
-    tone text,
+    tone map<text, double>,
     image text,
     videos text,
     quotations text,
