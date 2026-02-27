@@ -27,7 +27,7 @@ def connexion_établie():
         
         cluster = Cluster(
             contact_points=SCYLLA_NODES, 
-            port=9042
+            port=9042,
             auth_provider=auth, 
             protocol_version=PROTOCOL_VERSION
             load_balancing_policy=TokenAwarePolicy(
