@@ -29,7 +29,7 @@ def connexion_établie():
             contact_points=SCYLLA_NODES, 
             port=9042,
             auth_provider=auth, 
-            protocol_version=PROTOCOL_VERSION
+            protocol_version=PROTOCOL_VERSION,
             load_balancing_policy=TokenAwarePolicy(
                 DCAwareRoundRobinPolicy(local_dc=LOCAL_DC)), 
         )       
