@@ -34,9 +34,9 @@ def connexion_établie():
                 DCAwareRoundRobinPolicy(local_dc=LOCAL_DC)), 
         )       
                
-    session = cluster.connect(SCYLLA_KEYSPACE)
-    row = session.execute("SELECT release_version FROM System.local").one()
-    log.info("Connexion Scylla OK. release_version=%s", getattr(row, "release_version", None))
+        session = cluster.connect(SCYLLA_KEYSPACE)
+        row = session.execute("SELECT release_version FROM System.local").one()
+        log.info("Connexion Scylla OK. release_version=%s", getattr(row, "release_version", None))
     
     except Exception as e:
         log.exception("erreur de connexion à Scylladb ma biche")
