@@ -12,7 +12,6 @@ log = logging.getLogger(__name__)
 
 # --- CONNEXION AScyllaDB ---
 SCYLLA_NODES = ['172.20.0.171', '172.20.0.172', '172.20.0.173']
-SCYLLA_PORT = 9042
 SCYLLA_USER = 'user_kawasaki'
 SCYLLA_PASS = 'wTwF0UQRqL4it4j'
 SCYLLA_KEYSPACE = 'keyspace_pour_les_nuls'
@@ -28,7 +27,7 @@ def connexion_établie():
         
         cluster = Cluster(
             contact_points=SCYLLA_NODES, 
-            port=SCYLLA_PORT
+            port=9042
             auth_provider=auth, 
             protocol_version=PROTOCOL_VERSION
             load_balancing_policy=TokenAwarePolicy(
