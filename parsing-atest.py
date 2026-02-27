@@ -38,7 +38,7 @@ def connexion_etablie():
         row = session.execute("SELECT release_version FROM System.local").one()
         log.info("Connexion Scylla OK. release_version=%s", getattr(row, "release_version", None))
 
-        # session.execute("""CREATE KEYSPACE IF NOT EXISTS lebestkeyspace""")
+        session.execute("""CREATE KEYSPACE IF NOT EXISTS lebestkeyspace""")
     
     except Exception as e:
         log.exception("erreur de connexion à Scylladb ma biche")
