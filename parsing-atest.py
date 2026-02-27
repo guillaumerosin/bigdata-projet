@@ -18,7 +18,7 @@ SCYLLA_KEYSPACE = 'keyspace_pour_les_nuls'
 LOCAL_DC = "datacenter1" # nom du datacenter local
 PROTOCOL_VERSION = 4 # pour éviter les warnings de downgrade
 
-def connexion_établie():
+def connexion_etablie():
     cluster = None
     session = None
 
