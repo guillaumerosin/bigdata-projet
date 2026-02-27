@@ -2,13 +2,12 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import annotations
-
-from dataclasses import dataclass
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from cassandra.auth import PlainTextAuthProvider
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-
 from cassandra.cluster import Cluster
-from cassandra.query import PreparedStatement
+
 
 # --- CONNEXION AScyllaDB ---
 SCYLLA_NODES = ['172.20.0.171', '172.20.0.172', '172.20.0.173']
@@ -21,19 +20,21 @@ SCYLLA_KEYSPACE = 'keyspace_pour_les_nuls'
 cluster = Cluster(SCYLLA_NODES, auth_provider=PlainTextAuthProvider(username=SCYLLA_USER, password=SCYLLA_PASS))
 session = cluster.connect(SCYLLA_KEYSPACE)
 
-console.log(session, "la connexion est établie")
+def connexion_établie():
+    print(session, "la connexion est établie avec succès ma biche")
+    return session
 
 dag = DAG(
     'a1_scylladb_main_parsing',
-    description='Parsing Atest',
+    description='Connexion à ScyllaDB',
     schedule_interval=None,
     start_date=datetime(year=2026, month=2, day=27),
     catchup=False,
-    
+
 )
 task_parsing = PythonOperator(
-    task_id='task_parsing',
-    python_callable=parsing_atest,
+    task_id='connexion_établie',
+    python_callable=connexion_établie,
     dag=dag,
 )
 
