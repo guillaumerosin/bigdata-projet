@@ -65,8 +65,8 @@ def create_db():
     cluster = None
     session = None
     try:
-        auth = PlainTextAuthProvider(username=SCYLLA_USER,password=SCYLLA_PASS)
-	cluster = Cluster(
+        auth = PlainTextAuthProvider(username=SCYLLA_USER, password=SCYLLA_PASS)
+        cluster = Cluster(
             contact_points=SCYLLA_NODES,
             port=9042,
             auth_provider=auth,
@@ -113,14 +113,14 @@ def create_db():
         """)
 
         log.info("Table créée")
-   except Exception as e:
-	log.exception("erreur lors de la création de la db")
-	raise
-   finally:
-	if session is not None:
-   	     session.shutdown()
-	if cluster is not None:
-	     cluster.shutdown()
+    except Exception as e:
+        log.exception("erreur lors de la création de la db")
+        raise
+    finally:
+        if session is not None:
+            session.shutdown()
+        if cluster is not None:
+            cluster.shutdown()
 
 
 # DAG Airflow
