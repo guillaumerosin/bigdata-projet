@@ -26,10 +26,7 @@ def connexion_etablie():
     session = None
 
     try:
-        auth = PlainTextAuthProvider(
-            username=SCYLLA_USER,
-            password=SCYLLA_PASS
-        )
+        auth = PlainTextAuthProvider(username=SCYLLA_USER,password=SCYLLA_PASS)
 
         cluster = Cluster(
             contact_points=SCYLLA_NODES,
@@ -87,8 +84,8 @@ def create_db():
         session.execute("""
             CREATE KEYSPACE IF NOT EXISTS gdelt
             WITH replication = {
-                 'class': 'SimpleStrategy',
-                 'replication_factor': 1
+                 'class': 'NetworkTopologyStrategy',
+                 'replication_factor': 3
             };
         """)  
     
@@ -127,8 +124,9 @@ def create_db():
         if cluster is not None:
             cluster.shutdown()
 
-#commentaire
-# DAG Airflow
+
+
+
 with DAG(
     dag_id="a1_scylladb_main_parsing",
     schedule=None,
