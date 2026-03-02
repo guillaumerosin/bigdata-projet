@@ -16,6 +16,9 @@ SCYLLA_KEYSPACE = 'keyspace_pour_les_nuls'
 LOCAL_DC = "datacenter1"
 PROTOCOL_VERSION = 4
 
+KAFKA_TOPIC = "test"
+KAFKA_BOOTSTRAP = ["172.20.0.51:9092","172.20.0.52:9092"]
+
 
 def connexion_etablie():
     from cassandra.cluster import Cluster
@@ -125,6 +128,14 @@ def create_db():
             cluster.shutdown()
 
 
+def read_kafka_for_scylla():
+    import json
+    import uuid
+    from kafka import KafkaConsumer
+
+    consumer = KafkaConsumer (
+        KAFKA_TOPIC,
+    )
 
 
 with DAG(
