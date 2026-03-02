@@ -135,7 +135,27 @@ def read_kafka_for_scylla():
 
     consumer = KafkaConsumer (
         KAFKA_TOPIC,
+        bootstrap_servers=KAFKA_BOOTSTRAP,
+        auto_offset_reset="earliest",
+        enable_auto_commit=True,
+        group_id="aurflow_scylla_writer",
+        value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+        consumer_timeout_ms=10000, 
     )
+    messages = [msg.value for msg in consumer]
+    consumer.close()
+
+    log.info(f"{len(messages)} messages lus depuis Kafka")
+
+    if messages:
+        log.info("Exemple 1er message Kafka: %s", messages[0])
+
+    if not messages:
+        print("Aucune message à insérer.")
+        return
+    
+    
+
 
 
 with DAG(
@@ -155,5 +175,9 @@ with DAG(
         python_callable=create_db,
     )
 
+    read_kafka_task = PythonOperator(
+        task_id="read_kafka_for_scylla",
+        python_callable=read_kafka_for_scylla,
+    )
     # Ordre des tâches
-    connexion_task >> create_task
+    connexion_task >> create_task >> read_kafka_task
