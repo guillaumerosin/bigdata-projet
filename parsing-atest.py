@@ -127,7 +127,7 @@ def create_db():
         if cluster is not None:
             cluster.shutdown()
 
-
+#commentaire
 # DAG Airflow
 with DAG(
     dag_id="a1_scylladb_main_parsing",
