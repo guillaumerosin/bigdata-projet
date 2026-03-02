@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # coding by guillaume rosin
 import logging
-from cassandra.cluster import Cluster
-from cassandra.auth import PlainTextAuthProvider
+from datetime import datetime
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime
-from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
 
 log = logging.getLogger(__name__)
 
-# CONNEXION A ScyllaDB 
+# CONNEXION A ScyllaDB
 SCYLLA_NODES = ['172.20.0.171', '172.20.0.172', '172.20.0.173']
 SCYLLA_USER = 'user_kawasaki'
 SCYLLA_PASS = 'wTwF0UQRqL4it4j'
@@ -20,6 +18,10 @@ PROTOCOL_VERSION = 4
 
 
 def connexion_etablie():
+    from cassandra.cluster import Cluster
+    from cassandra.auth import PlainTextAuthProvider
+    from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
+
     cluster = None
     session = None
 
@@ -61,7 +63,10 @@ def connexion_etablie():
 
 
 def create_db():
-    # session non défini ici → faudra corriger après
+    from cassandra.cluster import Cluster
+    from cassandra.auth import PlainTextAuthProvider
+    from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
+
     cluster = None
     session = None
     try:
