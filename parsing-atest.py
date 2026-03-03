@@ -141,7 +141,7 @@ def read_kafka_for_scylla():
         auto_offset_reset="earliest",
         enable_auto_commit=False,
         group_id=None,
-        value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+        # value_deserializer=lambda x: json.loads(x.decode("utf-8")),  # c'est pas du json debilous
         consumer_timeout_ms=10000, 
     )
     messages = [msg.value for msg in consumer]
@@ -163,8 +163,6 @@ def read_kafka_for_scylla():
     
 #def insert_data_scylla():
     #cleaner = DataCleaner()
-
-
 
 
 with DAG(
