@@ -21,6 +21,103 @@ KAFKA_BOOTSTRAP = ["172.20.0.51:9092","172.20.0.52:9092"]
 
 MIN_COLUMNS = 27
 
+# Parsing 1 : source_type — conversion numéro → libellé
+SOURCE_TYPE_MAP = {
+    "1": "Web",
+    "2": "Citationonly",
+    "3": "Core",
+    "4": "Dtic",
+    "5": "Jstor",
+    "6": "Nontextualsource",
+}
+
+
+def transform_v15tone(raw: str) -> str:
+    """Parse le champ tone v1.5 (tone,pos,neg,pol,act,self,wc) et retourne un libellé lisible."""
+    if not raw:
+        return "NA"
+    raw = raw.strip()
+    if not raw:
+        return "NA"
+    parts = raw.split(",")
+    if len(parts) != 7:
+        return f"Format invalide ({len(parts)} valeurs, attendu 7)."
+    try:
+        tone, pos, neg, pol, act, self_, wc = (
+            float(parts[0]), float(parts[1]), float(parts[2]),
+            float(parts[3]), float(parts[4]), float(parts[5]),
+            int(float(parts[6]))
+        )
+    except (ValueError, TypeError):
+        return "NA"
+
+    if tone < -10:
+        tl = "extrêmement négatif"
+    elif tone < -5:
+        tl = "très négatif"
+    elif tone < -2:
+        tl = "négatif"
+    elif tone < -0.5:
+        tl = "légèrement négatif"
+    elif tone <= 0.5:
+        tl = "neutre"
+    elif tone <= 2:
+        tl = "légèrement positif"
+    elif tone <= 5:
+        tl = "positif"
+    elif tone <= 10:
+        tl = "très positif"
+    else:
+        tl = "extrêmement positif"
+
+    vocab = (
+        f"vocabulaire négatif dominant ({neg}% vs {pos}%)" if neg > pos + 1 else
+        f"vocabulaire positif dominant ({pos}% vs {neg}%)" if pos > neg + 1 else
+        f"vocabulaire équilibré (positif {pos}%, négatif {neg}%)"
+    )
+    al = "très actif" if act >= 8 else "modérément actif" if act >= 3 else "passif"
+    sl = "subjectif" if self_ >= 2 else "légèrement personnel" if self_ >= 0.5 else "impersonnel"
+    wl = "très court" if wc < 100 else "court" if wc < 300 else "standard" if wc < 800 else "long" if wc < 2000 else "très long"
+
+    return (
+        f"Ton {tl} (score = {tone}). {vocab.capitalize()}. "
+        f"Charge émotionnelle : {pol}. Style {al} (densité action = {act}). "
+        f"Registre {sl} (self/group = {self_}). Document {wl} ({wc} mots)."
+    )
+
+
+# Codebook v2GCAM : code → libellé (chargé depuis gcam_codebook.json)
+_GCAM_CODEBOOK = {}
+try:
+    import os as _os
+    import json as _json
+    _gcam_path = _os.path.join(_os.path.dirname(__file__), "gcam_codebook.json")
+    with open(_gcam_path, "r", encoding="utf-8") as _f:
+        _GCAM_CODEBOOK = _json.load(_f)
+except Exception:
+    pass
+
+
+def transform_v2gcam(raw: str) -> str:
+    """Convertit les codes v2GCAM en libellés via le codebook. Plusieurs codes séparés par ';' sont supportés."""
+    if not raw or not str(raw).strip():
+        return "NA"
+    raw = str(raw).strip()
+    codes = [c.strip() for c in raw.split(";") if c.strip()]
+    if not codes:
+        return "NA"
+    labels = []
+    for code in codes:
+        if code in _GCAM_CODEBOOK:
+            label = _GCAM_CODEBOOK[code]
+            if isinstance(label, dict):
+                label = label.get("label", label.get("name", str(label)))
+            labels.append(str(label))
+        else:
+            labels.append(code)
+    return "; ".join(labels) if labels else "NA"
+
+
 def _get_cluster():
     """Crée et retourne un objet Cluster Cassandra/ScyllaDB."""
     from cassandra.cluster import Cluster
@@ -196,10 +293,19 @@ def my_process_data(raw: str) -> dict | None:
         log.warning("Ligne sans id, ignorée : %s", raw[:20])
         return None 
 
+    raw_source_type = safe_get(parts, 2)
+    source_type = SOURCE_TYPE_MAP.get(str(raw_source_type).strip(), raw_source_type) if raw_source_type else None
+
+    raw_tone = safe_get(parts, 12)
+    tone = transform_v15tone(raw_tone) if raw_tone else "NA"
+
+    raw_v2gcam = safe_get(parts, 14)
+    v2gcam = transform_v2gcam(raw_v2gcam) if raw_v2gcam else "NA"
+
     msg = {
         "id":               safe_get(parts, 0),
         "date":             safe_get(parts, 1),
-        "source_type":      safe_get(parts, 2),
+        "source_type":      source_type,
         "source":           safe_get(parts, 3),
         "source_id":        safe_get(parts, 4),
         "v1themes":         safe_get(parts, 5),
@@ -207,9 +313,9 @@ def my_process_data(raw: str) -> dict | None:
         "v2locations":      safe_get(parts, 8),
         "v1persons":        safe_get(parts, 9),
         "v1organizations":  safe_get(parts, 11),
-        "tone":             safe_get(parts, 12),
+        "tone":             tone,
         "dates_dans_texte": safe_get(parts, 13),
-        "v2GCAM":           safe_get(parts, 14),
+        "v2GCAM":           v2gcam,
         "image":            safe_get(parts, 15),
         "videos":           safe_get(parts, 16),
         "valeurs_numeriques": safe_get(parts, 17),
