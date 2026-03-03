@@ -29,6 +29,7 @@ SOURCE_TYPE_MAP = {
     "4": "Dtic",
     "5": "Jstor",
     "6": "Nontextualsource",
+    "7": "nothing",
 }
 
 
@@ -307,7 +308,11 @@ def my_process_data(raw: str) -> dict | None:
         return None 
 
     raw_source_type = safe_get(parts, 2)
-    source_type = SOURCE_TYPE_MAP.get(str(raw_source_type).strip(), raw_source_type) if raw_source_type else None
+    code = str(raw_source_type).strip() if raw_source_type is not None else ""
+    if not code:
+        source_type = SOURCE_TYPE_MAP["7"]
+    else:
+        source_type = SOURCE_TYPE_MAP.get(code, SOURCE_TYPE_MAP["7"])
 
     raw_tone = safe_get(parts, 12)
     tone = transform_v15tone(raw_tone) if raw_tone else "NA"
