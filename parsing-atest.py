@@ -128,7 +128,7 @@ def create_db():
             v2locations text,
             v1persons text,
             v2persons text,
-            v1organizations v1org_list,
+            v1organizations text,
             v2organizations text,
             tone map<text, double>,
             image text,
