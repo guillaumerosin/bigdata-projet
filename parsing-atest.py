@@ -29,7 +29,7 @@ SOURCE_TYPE_MAP = {
     "4": "Dtic",
     "5": "Jstor",
     "6": "Nontextualsource",
-    "7": "yo",  # chiffre autre que 1–6 ou vide
+    "7": "NA",  # chiffre autre que 1–6 ou vide
 }
 
 
@@ -315,10 +315,10 @@ def my_process_data(raw: str) -> dict | None:
         source_type = SOURCE_TYPE_MAP.get(code, SOURCE_TYPE_MAP["7"])
 
     raw_tone = safe_get(parts, 12)
-    tone = transform_v15tone(raw_tone) if raw_tone else "NA"
+    tone = transform_v15tone(raw_tone) if raw_tone else " "
 
     raw_dates = safe_get(parts, 13)
-    dates_dt = transform_v2dates(raw_dates) if raw_dates else "NA"
+    dates_dt = transform_v2dates(raw_dates) if raw_dates else " "
 
     msg = {
         "id":               safe_get(parts, 0),
