@@ -144,12 +144,12 @@ def read_kafka_for_scylla():
         # value_deserializer=lambda x: json.loads(x.decode("utf-8")),  # c'est pas du json debilous
         consumer_timeout_ms=10000, 
     )
+    messages = []
     for msg in consumer:
-        raw = raw = msg.value.decode("utf-8", errors="replace")
-        log.info("Message brut: %s", raw)
-        parts = raw.split("\t")
-        
-    messages = [msg.value for msg in consumer]
+        raw = msg.value.decode("utf-8", errors="replace")
+        log.info("Message brut Kafka: %s", raw)
+        messages.append(raw)
+
     consumer.close()
 
     #log.info(f"{len(messages)} messages lus depuis Kafka")
