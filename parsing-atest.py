@@ -152,6 +152,13 @@ def read_kafka_for_scylla():
 
     consumer.close()
 
+def my_process_data(raw: str) -> dict | None:
+    parts = raw.split("\t")
+
+    if len(parts) < N:  #N étant le nombre minimal que je veux utiliser
+        log.warning("Ligne trop courte")
+
+
     #log.info(f"{len(messages)} messages lus depuis Kafka")
     #for message in consumer:    
         #log.info(f"Partition:",message.partition)
