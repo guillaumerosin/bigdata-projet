@@ -129,7 +129,7 @@ def create_db():
             v2persons text,
             v1organizations text,
             v2organizations text,
-            tone text,
+            v1.5tone text,
             image text,
             videos text,
             quotations text,
