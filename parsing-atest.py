@@ -38,6 +38,9 @@ def _get_cluster():
             DCAwareRoundRobinPolicy(local_dc=LOCAL_DC)
         ),
     )
+# Retourne parts[index] si présent, sinon None => NULL en base
+def safe_get(parts, index):
+    return parts[index] if index < len(parts) else None
 
 def connexion_etablie():
     from cassandra.cluster import Cluster
@@ -169,17 +172,18 @@ def read_kafka_for_scylla():
         messages.append(raw)
 
     consumer.close()
+    return messages
 
 def my_process_data(raw: str) -> dict | None:
     parts = raw.split("\t") #je parse ma data
-    
-    if len(parts) < MIN_COLUMNS:  #N étant le nombre minimal que je veux utiliser
-        log.warning("Ligne trop courte (%d colonnes), ignorée: %s",len(parts),raw[:80])
-        return None
+
+    #if len(parts) < MIN_COLUMNS:  #N étant le nombre minimal que je veux utiliser
+        #log.warning("Ligne trop courte (%d colonnes), ignorée: %s",len(parts),raw[:80])
+        #return None
     
     # Ligne sans identifiant (je sais pas si ca sert c'est un sureté)
     if not parts[0].strip():
-        log.warning("Ligne sans id, ignorée : %s", raw[:80])
+        log.warning("Ligne sans id, ignorée : %s", raw[:20])
         return None 
 
     msg = {
@@ -202,6 +206,7 @@ def my_process_data(raw: str) -> dict | None:
         "extraxml":         safe_get(parts, 16),
     }
     return msg
+
 
 def insertion_scylla(session, msg: dict) -> None:
     """Insère un article dans la table gdelt.articles."""
@@ -247,6 +252,39 @@ def insertion_scylla(session, msg: dict) -> None:
     )
 
 
+def task_parse_messages(**context):
+    """Tâche Airflow : récupère les messages Kafka via XCom, parse chaque ligne, renvoie la liste des dicts."""
+    ti = context["ti"]
+    messages = ti.xcom_pull(task_ids="read_kafka_for_scylla")
+    if not messages:
+        log.info("Aucun message à parser (XCom vide).")
+        return []
+    result = []
+    for raw in messages:
+        parsed = my_process_data(raw)
+        if parsed is not None:
+            result.append(parsed)
+    log.info("Parsing terminé : %d messages valides sur %d.", len(result), len(messages))
+    return result
+
+
+def task_insert_to_scylla(**context):
+    """Tâche Airflow : récupère la liste des dicts parsés via XCom, se connecte à Scylla, insère chaque article."""
+    ti = context["ti"]
+    parsed_list = ti.xcom_pull(task_ids="my_process_data")
+    if not parsed_list:
+        log.info("Aucun message à insérer.")
+        return
+    cluster = _get_cluster()
+    session = cluster.connect("gdelt")
+    try:
+        for msg in parsed_list:
+            insertion_scylla(session, msg)
+        log.info("Ingest terminé : %d articles insérés.", len(parsed_list))
+    finally:
+        session.shutdown()
+        cluster.shutdown()
+
 
 with DAG(
     dag_id="a1_scylladb_main_parsing",
@@ -270,14 +308,14 @@ with DAG(
         python_callable=read_kafka_for_scylla,
     )
 
-    my_process_data = PythonOperator(
+    parse_task = PythonOperator(
         task_id="my_process_data",
-        python_callable=my_process_data,
+        python_callable=task_parse_messages,
     )
 
-    insertion_scylla = PythonOperator(
+    insert_task = PythonOperator(
         task_id="insertion_scylla",
-        python_callable=insertion_scylla,
+        python_callable=task_insert_to_scylla,
     )
-    # Ordre des tâches
-    connexion_task >> create_task >> read_kafka_task >> my_process_data >> insertion_scylla
+    # Ordre des tâches (graphe inchangé : 5 nœuds)
+    connexion_task >> create_task >> read_kafka_task >> parse_task >> insert_task
