@@ -139,7 +139,7 @@ def read_kafka_for_scylla():
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
         auto_offset_reset="earliest",
-        enable_auto_commit=false,
+        enable_auto_commit=False,
         group_id=None,
         value_deserializer=lambda x: json.loads(x.decode("utf-8")),
         consumer_timeout_ms=10000, 
