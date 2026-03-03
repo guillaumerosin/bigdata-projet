@@ -333,7 +333,7 @@ def my_process_data(raw: str) -> dict | None:
         "v1organizations":  safe_get(parts, 11),
         "tone":             tone,
         "dates_dans_texte": dates_dt,
-        "v2GCAM":           safe_get(parts, 14),
+        "v2GCAM":           "temp",
         "image":            safe_get(parts, 15),
         "videos":           safe_get(parts, 16),
         "valeurs_numeriques": safe_get(parts, 17),
