@@ -5,7 +5,6 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-#from data_cleaner import DataCleaner
 
 log = logging.getLogger(__name__)
 
