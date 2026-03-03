@@ -336,7 +336,7 @@ def my_process_data(raw: str) -> dict | None:
         "v2GCAM":           "temp",
         "image":            safe_get(parts, 15),
         "videos":           safe_get(parts, 16),
-        "valeurs_numeriques": safe_get(parts, 17),
+        "valeurs_numeriques": "temp",
         "extraxml":         safe_get(parts, 18),
     }
     return msg
