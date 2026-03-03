@@ -176,6 +176,13 @@ def read_kafka_for_scylla():
     log.info("%d messages lus depuis Kafka", len(messages))
     return messages
 
+def to_list_or_none(s):
+    """Convertit une chaîne 'a;b;c' en liste ['a','b','c'], ou None si vide."""
+    if s is None or not s.strip():
+        return None
+    return [x for x in s.split(";") if x]
+
+
 def my_process_data(raw: str) -> dict | None:
     parts = raw.split("\t") #je parse ma data
 
