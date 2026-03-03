@@ -7,8 +7,6 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from data_cleaner import DataCleaner
 
-
-
 log = logging.getLogger(__name__)
 
 # CONNEXION A ScyllaDB
@@ -149,11 +147,11 @@ def read_kafka_for_scylla():
     messages = [msg.value for msg in consumer]
     consumer.close()
 
-    log.info(f"{len(messages)} messages lus depuis Kafka")
-    for message in consumer:    
-        log.info(f"Partition:",message.partition)
-        log.info(f"Offset:",message.offset)
-        log.info(f"Value",message.value[:200])
+    #log.info(f"{len(messages)} messages lus depuis Kafka")
+    #for message in consumer:    
+        #log.info(f"Partition:",message.partition)
+        #log.info(f"Offset:",message.offset)
+        #log.info(f"Value",message.value[:200])
 
 
     if messages:
@@ -163,8 +161,8 @@ def read_kafka_for_scylla():
         print("Aucune message à insérer.")
         return
     
-def insert_data_scylla():
-    cleaner = DataCleaner()
+#def insert_data_scylla():
+    #cleaner = DataCleaner()
 
 
 
