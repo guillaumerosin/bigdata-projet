@@ -29,7 +29,7 @@ SOURCE_TYPE_MAP = {
     "4": "Dtic",
     "5": "Jstor",
     "6": "Nontextualsource",
-    "7": "nothing",
+    "7": "yo",  # chiffre autre que 1–6 ou vide
 }
 
 
