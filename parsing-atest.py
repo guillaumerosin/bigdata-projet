@@ -208,7 +208,7 @@ def my_process_data(raw: str) -> dict | None:
         "v2persons":        safe_get(parts, 8),
         "v1organizations":  to_list_or_none_WOW(safe_get(parts, 9)),
         "v2organizations":  safe_get(parts, 10),
-        "v1.5tone":             safe_get(parts, 11),
+        "v1.5tone":         safe_get(parts, 11),
         "image":            safe_get(parts, 12),
         "videos":           safe_get(parts, 13),
         "quotations":       safe_get(parts, 14),
@@ -228,7 +228,7 @@ def insertion_scylla(session, msg: dict) -> None:
             v1locations, v2locations,
             v1persons, v2persons,
             v1organizations, v2organizations,
-            tone, image, videos,
+            v1.5tone, image, videos,
             quotations, allnames, extraxml
         ) VALUES (
             %s, %s, %s,
@@ -252,7 +252,7 @@ def insertion_scylla(session, msg: dict) -> None:
             msg["v2persons"],
             msg["v1organizations"],
             msg["v2organizations"],
-            msg["tone"],
+            msg["v1.5tone"],
             msg["image"],
             msg["videos"],
             msg["quotations"],
