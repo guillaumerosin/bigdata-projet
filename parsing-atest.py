@@ -5,6 +5,9 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from data_cleaner import DataCleaner
+
+
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +131,7 @@ def create_db():
             cluster.shutdown()
 
 
+
 def read_kafka_for_scylla():
     import json
     import uuid
@@ -137,8 +141,8 @@ def read_kafka_for_scylla():
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
         auto_offset_reset="earliest",
-        enable_auto_commit=True,
-        group_id="aurflow_scylla_writer",
+        enable_auto_commit=false,
+        group_id=None,
         value_deserializer=lambda x: json.loads(x.decode("utf-8")),
         consumer_timeout_ms=10000, 
     )
@@ -146,6 +150,11 @@ def read_kafka_for_scylla():
     consumer.close()
 
     log.info(f"{len(messages)} messages lus depuis Kafka")
+    for message in consumer:    
+        log.info(f"Partition:",message.partition)
+        log.info(f"Offset:",message.offset)
+        log.info(f"Value",message.value[:200])
+
 
     if messages:
         log.info("Exemple 1er message Kafka: %s", messages[0])
@@ -154,7 +163,9 @@ def read_kafka_for_scylla():
         print("Aucune message à insérer.")
         return
     
-    
+def insert_data_scylla():
+    cleaner = DataCleaner()
+
 
 
 
