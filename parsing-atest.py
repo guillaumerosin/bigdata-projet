@@ -86,7 +86,7 @@ def transform_v15tone(raw: str) -> str:
     )
 
 
-# Codebook v2GCAM : code → libellé (chargé depuis gcam_codebook.json)
+# Codebook v2GCAM : code → [cat, name] ou dict (chargé depuis gcam_codebook.json)
 _GCAM_CODEBOOK = {}
 try:
     import os as _os
@@ -97,25 +97,130 @@ try:
 except Exception:
     pass
 
+_CB = _GCAM_CODEBOOK  # alias pour transform_v2gcam
+
+
+def _dlabel(density: float) -> str:
+    """Libellé de densité pour affichage GCAM."""
+    if density < 0.5:
+        return "très faible"
+    if density < 2:
+        return "faible"
+    if density < 5:
+        return "modéré"
+    if density < 10:
+        return "élevé"
+    return "très élevé"
+
 
 def transform_v2gcam(raw: str) -> str:
-    """Convertit les codes v2GCAM en libellés via le codebook. Plusieurs codes séparés par ';' sont supportés."""
-    if not raw or not str(raw).strip():
+    """Parse le champ v2GCAM (entrées key:value séparées par des virgules) et produit un résumé lisible."""
+    if not raw:
         return "NA"
     raw = str(raw).strip()
-    codes = [c.strip() for c in raw.split(";") if c.strip()]
-    if not codes:
+    entries = [e.strip() for e in raw.split(",") if ":" in e]
+    wc = 1
+    for e in entries:
+        k, _, v = e.partition(":")
+        if k == "wc":
+            try:
+                wc = int(v)
+            except (ValueError, TypeError):
+                pass
+
+    count_items: list[tuple[float, str]] = []
+    value_items: list[str] = []
+    for e in entries:
+        k, _, v = e.partition(":")
+        if k in ("wc", "nwc"):
+            continue
+        elif k.startswith("c"):
+            dim = k[1:]
+            try:
+                count = int(v)
+                density = round((count / max(wc, 1)) * 100, 3)
+                info = _CB.get(dim)
+                if isinstance(info, (list, tuple)) and len(info) >= 2:
+                    name = f"{info[0]} / {info[1]}"
+                elif isinstance(info, dict):
+                    name = f"{info.get('category', info.get(0, ''))} / {info.get('name', info.get(1, dim))}"
+                else:
+                    name = f"Dict.{dim.split('.')[0]} / dim.{dim}" if dim else f"dim.{dim}"
+                count_items.append((density, f"{name} : {count} mots ({density}%, {_dlabel(density)})"))
+            except (ValueError, TypeError, KeyError):
+                pass
+        elif k.startswith("v"):
+            dim = k[1:]
+            try:
+                score = float(v)
+                info = _CB.get(dim)
+                if isinstance(info, (list, tuple)) and len(info) >= 2:
+                    name = f"{info[0]} / {info[1]}"
+                elif isinstance(info, dict):
+                    name = f"{info.get('category', info.get(0, ''))} / {info.get('name', info.get(1, dim))}"
+                else:
+                    name = f"Dict.{dim.split('.')[0]} / dim.{dim}" if dim else f"dim.{dim}"
+                value_items.append(f"{name} : score = {round(score, 4)}")
+            except (ValueError, TypeError, KeyError):
+                pass
+
+    if not count_items and not value_items:
         return "NA"
-    labels = []
-    for code in codes:
-        if code in _GCAM_CODEBOOK:
-            label = _GCAM_CODEBOOK[code]
-            if isinstance(label, dict):
-                label = label.get("label", label.get("name", str(label)))
-            labels.append(str(label))
-        else:
-            labels.append(code)
-    return "; ".join(labels) if labels else "NA"
+
+    count_items.sort(key=lambda x: x[0], reverse=True)
+    result = (
+        f"Document de {wc} mots. {len(count_items)} dimensions, {len(value_items)} scores continus.\n"
+        f"Top 10 dimensions par densité :\n"
+        + "\n".join(f"  • {label}" for _, label in count_items[:10])
+    )
+    if value_items:
+        result += "\nScores continus (extrait) :\n" + "\n".join(f"  • {l}" for l in value_items[:5])
+    return result
+
+
+def transform_v2dates(raw: str) -> str:
+    """Transforme le champ 'dates_dans_texte' en dates lisibles à partir du format GDELT."""
+    if not raw:
+        return "NA"
+    raw = str(raw)
+    blocks = [b.strip() for b in raw.split(";#") if b.strip()]
+    results: list[str] = []
+    for block in blocks:
+        parts = [p for p in block.split("#") if p != ""]
+        if len(parts) != 5:
+            continue
+        try:
+            res, mo, d, y, offset = (
+                int(parts[0]),
+                int(parts[1]),
+                int(parts[2]),
+                int(parts[3]),
+                int(parts[4]),
+            )
+            if res == 1:
+                date_str = f"{y:04d}0000000000"
+            elif res == 2:
+                date_str = f"{y:04d}{mo:02d}00000000"
+            elif res == 3:
+                date_str = f"{y:04d}{mo:02d}{d:02d}000000"
+            elif res == 4:
+                date_str = f"0000{mo:02d}{d:02d}000000"
+            else:
+                date_str = "00000000000000"
+            if offset < 200:
+                pos = "titre/intro"
+            elif offset < 1000:
+                pos = "corps"
+            else:
+                pos = "conclusion"
+            results.append(f"{date_str} (position {offset}, {pos})")
+        except (ValueError, TypeError):
+            continue
+    if not results:
+        return "NA"
+    return f"{len(results)} date(s) mentionnée(s) :\n" + "\n".join(
+        f"  • {r}" for r in results
+    )
 
 
 def _get_cluster():
@@ -302,6 +407,9 @@ def my_process_data(raw: str) -> dict | None:
     raw_v2gcam = safe_get(parts, 14)
     v2gcam = transform_v2gcam(raw_v2gcam) if raw_v2gcam else "NA"
 
+    raw_dates = safe_get(parts, 13)
+    dates_dt = transform_v2dates(raw_dates) if raw_dates else "NA"
+
     msg = {
         "id":               safe_get(parts, 0),
         "date":             safe_get(parts, 1),
@@ -314,7 +422,7 @@ def my_process_data(raw: str) -> dict | None:
         "v1persons":        safe_get(parts, 9),
         "v1organizations":  safe_get(parts, 11),
         "tone":             tone,
-        "dates_dans_texte": safe_get(parts, 13),
+        "dates_dans_texte": dates_dt,
         "v2GCAM":           v2gcam,
         "image":            safe_get(parts, 15),
         "videos":           safe_get(parts, 16),
