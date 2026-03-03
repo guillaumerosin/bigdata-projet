@@ -175,7 +175,7 @@ def read_kafka_for_scylla():
     log.info("%d messages lus depuis Kafka", len(messages))
     return messages
 
-def to_list_or_none(s):
+def to_list_or_none_WOW(s):
     """Convertit une chaîne 'a;b;c' en liste ['a','b','c'], ou None si vide."""
     if s is None or not s.strip():
         return None
@@ -206,7 +206,7 @@ def my_process_data(raw: str) -> dict | None:
         "v2locations":      safe_get(parts, 6),
         "v1persons":        safe_get(parts, 7),
         "v2persons":        safe_get(parts, 8),
-        "v1organizations":  to_list_or_none(safe_get(parts, 9)),
+        "v1organizations":  to_list_or_none_WOW(safe_get(parts, 9)),
         "v2organizations":  safe_get(parts, 10),
         "tone":             safe_get(parts, 11),
         "image":            safe_get(parts, 12),
