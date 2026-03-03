@@ -87,6 +87,92 @@ def transform_v15tone(raw: str) -> str:
     )
 
 
+# Codebook GCAM : id dimension → [catégorie, nom] (gcam_codebook.json)
+_GCAM_CODEBOOK: dict = {}
+try:
+    import os as _os
+    import json as _json
+    _gcam_path = _os.path.join(_os.path.dirname(__file__), "gcam_codebook.json")
+    with open(_gcam_path, "r", encoding="utf-8") as _f:
+        _GCAM_CODEBOOK = _json.load(_f)
+except Exception:
+    pass
+
+
+def _dlabel(density: float) -> str:
+    """Libellé de densité pour affichage GCAM."""
+    if density < 0.5:
+        return "très faible"
+    if density < 2:
+        return "faible"
+    if density < 5:
+        return "modéré"
+    if density < 10:
+        return "élevé"
+    return "très élevé"
+
+
+def transform_v2gcam(raw: str) -> str:
+    """Parse la colonne v2GCAM (entrées key:value séparées par des virgules) et produit un résumé lisible via gcam_codebook.json."""
+    if not raw or not str(raw).strip():
+        return "NA"
+    raw = str(raw).strip()
+    entries = [e.strip() for e in raw.split(",") if ":" in e]
+    wc = 1
+    for e in entries:
+        k, _, v = e.partition(":")
+        if k == "wc":
+            try:
+                wc = int(v)
+            except (ValueError, TypeError):
+                pass
+
+    count_items: list[tuple[float, str]] = []
+    value_items: list[str] = []
+    for e in entries:
+        k, _, v = e.partition(":")
+        if k in ("wc", "nwc"):
+            continue
+        if k.startswith("c"):
+            dim = k[1:]
+            try:
+                count = int(v)
+                density = round((count / max(wc, 1)) * 100, 3)
+                info = _GCAM_CODEBOOK.get(dim)
+                if isinstance(info, (list, tuple)) and len(info) >= 2:
+                    name = f"{info[0]} / {info[1]}"
+                else:
+                    name = f"dim.{dim}"
+                count_items.append((density, f"{name} : {count} mots ({density}%, {_dlabel(density)})"))
+            except (ValueError, TypeError):
+                pass
+        elif k.startswith("v"):
+            dim = k[1:]
+            try:
+                score = float(v)
+                info = _GCAM_CODEBOOK.get(dim)
+                if isinstance(info, (list, tuple)) and len(info) >= 2:
+                    name = f"{info[0]} / {info[1]}"
+                else:
+                    name = f"dim.{dim}"
+                value_items.append(f"{name} : score = {round(score, 4)}")
+            except (ValueError, TypeError):
+                pass
+
+    if not count_items and not value_items:
+        return "NA"
+
+    count_items.sort(key=lambda x: x[0], reverse=True)
+    result = (
+        f"Document de {wc} mots. {len(count_items)} dimensions, {len(value_items)} scores continus.\n"
+        "Top 10 dimensions par densité :\n"
+        + "\n".join(f"  • {label}" for _, label in count_items[:10])
+    )
+    if value_items:
+        result += "\nScores continus (extrait) :\n" + "\n".join(f"  • {l}" for l in value_items[:5])
+    return result
+
+
 def transform_v2dates(raw: str) -> str:
     """Transforme le champ 'dates_dans_texte' en dates lisibles à partir du format GDELT."""
     if not raw:
@@ -320,6 +406,9 @@ def my_process_data(raw: str) -> dict | None:
     raw_dates = safe_get(parts, 13)
     dates_dt = transform_v2dates(raw_dates) if raw_dates else " "
 
+    raw_v2gcam = safe_get(parts, 14)
+    v2gcam = transform_v2gcam(raw_v2gcam) if raw_v2gcam else "NA"
+
     msg = {
         "id":               safe_get(parts, 0),
         "date":             safe_get(parts, 1),
@@ -333,7 +422,7 @@ def my_process_data(raw: str) -> dict | None:
         "v1organizations":  safe_get(parts, 11),
         "tone":             tone,
         "dates_dans_texte": dates_dt,
-        "v2GCAM":           "temp",
+        "v2GCAM":           v2gcam,
         "image":            safe_get(parts, 15),
         "videos":           safe_get(parts, 16),
         "valeurs_numeriques": "temp",
