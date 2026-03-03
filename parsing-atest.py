@@ -228,7 +228,7 @@ def insertion_scylla(session, msg: dict) -> None:
             v1locations, v2locations,
             v1persons, v2persons,
             v1organizations, v2organizations,
-            v1.5tone, image, videos,
+            tone, image, videos,
             quotations, allnames, extraxml
         ) VALUES (
             %s, %s, %s,
