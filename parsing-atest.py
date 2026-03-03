@@ -20,6 +20,24 @@ PROTOCOL_VERSION = 4
 KAFKA_TOPIC = "test"
 KAFKA_BOOTSTRAP = ["172.20.0.51:9092","172.20.0.52:9092"]
 
+MIN_COLUMNS = 27
+
+def _get_cluster():
+    """Crée et retourne un objet Cluster Cassandra/ScyllaDB."""
+    from cassandra.cluster import Cluster
+    from cassandra.auth import PlainTextAuthProvider
+    from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
+
+    auth = PlainTextAuthProvider(username=SCYLLA_USER, password=SCYLLA_PASS)
+    return Cluster(
+        contact_points=SCYLLA_NODES,
+        port=9042,
+        auth_provider=auth,
+        protocol_version=PROTOCOL_VERSION,
+        load_balancing_policy=TokenAwarePolicy(
+            DCAwareRoundRobinPolicy(local_dc=LOCAL_DC)
+        ),
+    )
 
 def connexion_etablie():
     from cassandra.cluster import Cluster
@@ -153,28 +171,81 @@ def read_kafka_for_scylla():
     consumer.close()
 
 def my_process_data(raw: str) -> dict | None:
-    parts = raw.split("\t")
-
-    if len(parts) < N:  #N étant le nombre minimal que je veux utiliser
-        log.warning("Ligne trop courte")
-
-
-    #log.info(f"{len(messages)} messages lus depuis Kafka")
-    #for message in consumer:    
-        #log.info(f"Partition:",message.partition)
-        #log.info(f"Offset:",message.offset)
-        #log.info(f"Value",message.value[:200])
-
-
-    if messages:
-        log.info("Exemple 1er message Kafka: %s", messages[0])
-
-    if not messages:
-        print("Aucune message à insérer.")
-        return
+    parts = raw.split("\t") #je parse ma data
     
-#def insert_data_scylla():
-    #cleaner = DataCleaner()
+    if len(parts) < MIN_COLUMNS:  #N étant le nombre minimal que je veux utiliser
+        log.warning("Ligne trop courte (%d colonnes), ignorée: %s",len(parts),raw[:80])
+        return None
+    
+    # Ligne sans identifiant (je sais pas si ca sert c'est un sureté)
+    if not parts[0].strip():
+        log.warning("Ligne sans id, ignorée : %s", raw[:80])
+        return None 
+
+    msg = {
+        "id":               safe_get(parts, 0),
+        "date":             safe_get(parts, 1),
+        "source_type":      safe_get(parts, 2),
+        "v1themes":         safe_get(parts, 3),
+        "v2themes":         safe_get(parts, 4),
+        "v1locations":      safe_get(parts, 5),
+        "v2locations":      safe_get(parts, 6),
+        "v1persons":        safe_get(parts, 7),
+        "v2persons":        safe_get(parts, 8),
+        "v1organizations":  safe_get(parts, 9),
+        "v2organizations":  safe_get(parts, 10),
+        "tone":             safe_get(parts, 11),
+        "image":            safe_get(parts, 12),
+        "videos":           safe_get(parts, 13),
+        "quotations":       safe_get(parts, 14),
+        "allnames":         safe_get(parts, 15),
+        "extraxml":         safe_get(parts, 16),
+    }
+    return msg
+
+def insertion_scylla(session, msg: dict) -> None:
+    """Insère un article dans la table gdelt.articles."""
+    session.execute(
+        """
+        INSERT INTO gdelt.articles (
+            id, date, source_type,
+            v1themes, v2themes,
+            v1locations, v2locations,
+            v1persons, v2persons,
+            v1organizations, v2organizations,
+            tone, image, videos,
+            quotations, allnames, extraxml
+        ) VALUES (
+            %s, %s, %s,
+            %s, %s,
+            %s, %s,
+            %s, %s,
+            %s, %s,
+            %s, %s, %s,
+            %s, %s, %s
+        )
+        """,
+        (
+            msg["id"],
+            msg["date"],
+            msg["source_type"],
+            msg["v1themes"],
+            msg["v2themes"],
+            msg["v1locations"],
+            msg["v2locations"],
+            msg["v1persons"],
+            msg["v2persons"],
+            msg["v1organizations"],
+            msg["v2organizations"],
+            msg["tone"],
+            msg["image"],
+            msg["videos"],
+            msg["quotations"],
+            msg["allnames"],
+            msg["extraxml"],
+        ),
+    )
+
 
 
 with DAG(
@@ -198,5 +269,15 @@ with DAG(
         task_id="read_kafka_for_scylla",
         python_callable=read_kafka_for_scylla,
     )
+
+    my_process_data = PythonOperator(
+        task_id="my_process_data",
+        python_callable=my_process_data,
+    )
+
+    insertion_scylla = PythonOperator(
+        task_id="insertion_scylla",
+        python_callable=insertion_scylla,
+    )
     # Ordre des tâches
-    connexion_task >> create_task >> read_kafka_task
+    connexion_task >> create_task >> read_kafka_task >> my_process_data >> insertion_scylla
