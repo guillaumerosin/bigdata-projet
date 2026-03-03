@@ -128,7 +128,7 @@ def create_db():
             v2locations text,
             v1persons text,
             v2persons text,
-            v1organizations list<text>,
+            v1organizations v1org_list,
             v2organizations text,
             tone map<text, double>,
             image text,
@@ -168,15 +168,19 @@ def read_kafka_for_scylla():
     messages = []
     for msg in consumer:
         raw = msg.value.decode("utf-8", errors="replace")
-        log.info("Message brut Kafka: %s", raw)
+        # log.info("Message brut Kafka: %s", raw)  # debug: décommenter pour voir chaque message brut
+        # log.info("Message brut Kafka (200 premiers car.): %s", raw[:200])  # debug: version courte
         messages.append(raw)
 
     consumer.close()
+    log.info("%d messages lus depuis Kafka", len(messages))
     return messages
 
 def my_process_data(raw: str) -> dict | None:
     parts = raw.split("\t") #je parse ma data
 
+    # log.info("Nombre de colonnes: %d", len(parts))  # debug
+    # log.info("parts[0] (id)=%s, parts[1] (date)=%s", safe_get(parts, 0), safe_get(parts, 1))  # debug
     #if len(parts) < MIN_COLUMNS:  #N étant le nombre minimal que je veux utiliser
         #log.warning("Ligne trop courte (%d colonnes), ignorée: %s",len(parts),raw[:80])
         #return None
@@ -265,6 +269,8 @@ def task_parse_messages(**context):
         if parsed is not None:
             result.append(parsed)
     log.info("Parsing terminé : %d messages valides sur %d.", len(result), len(messages))
+    # if result:
+    #     log.info("Exemple 1er message parsé: %s", result[0])  # debug
     return result
 
 
