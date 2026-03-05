@@ -29,9 +29,21 @@ SOURCE_TYPE_MAP = {
     "4": "Dtic",
     "5": "Jstor",
     "6": "Nontextualsource",
-    "7": "NA",  # chiffre autre que 1–6 ou vide
 }
-
+def transform_date(raw: str) -> str:
+    """
+    Transforme une date GDELT de type YYYYMMDDHHMMSS (parfois partielle ou collée à d'autres caractères)
+    en chaîne lisible 'YYYY-MM-DD HH:MM:SS'.
+    """
+    if raw is None:
+        return "0000-01-01 00:00:00"
+    digits = "".join(ch for ch in str(raw).strip() if ch.isdigit())
+    if not digits:
+        return "0000-01-01 00:00:00"
+    digits = digits.ljust(14, "0")[:14]
+    y, m, d = digits[0:4], digits[4:6], digits[6:8]
+    hh, mm, ss = digits[8:10], digits[10:12], digits[12:14]
+    return f"{y}-{m}-{d} {hh}:{mm}:{ss}"
 
 def transform_v15tone(raw: str) -> str:
     """Parse le champ tone v1.5 (tone,pos,neg,pol,act,self,wc) et retourne un libellé lisible."""
@@ -400,6 +412,9 @@ def my_process_data(raw: str) -> dict | None:
     else:
         source_type = SOURCE_TYPE_MAP.get(code, SOURCE_TYPE_MAP["7"])
 
+    raw_date = safe_get(parts, 1)
+    date_human = transform_date(raw_date) if raw_date else "0000-01-01 00:00:00"
+
     raw_tone = safe_get(parts, 12)
     tone = transform_v15tone(raw_tone) if raw_tone else " "
 
@@ -411,7 +426,7 @@ def my_process_data(raw: str) -> dict | None:
 
     msg = {
         "id":               safe_get(parts, 0),
-        "date":             safe_get(parts, 1),
+        "date":             date_human,
         "source_type":      source_type,
         "source":           safe_get(parts, 3),
         "source_id":        safe_get(parts, 4),
