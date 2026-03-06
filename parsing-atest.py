@@ -29,7 +29,6 @@ SOURCE_TYPE_MAP = {
     "4": "Dtic",
     "5": "Jstor",
     "6": "Nontextualsource",
-    "7": "unknow",
 }
 def transform_date(raw: str) -> str:
     """
@@ -408,10 +407,11 @@ def my_process_data(raw: str) -> dict | None:
 
     raw_source_type = safe_get(parts, 2)
     code = str(raw_source_type).strip() if raw_source_type is not None else ""
+    # Si le code est vide ou inconnu, on bascule sur un libellé de repli explicite
     if not code:
-        source_type = SOURCE_TYPE_MAP["7"]
+        source_type = "unknow"
     else:
-        source_type = SOURCE_TYPE_MAP.get(code, SOURCE_TYPE_MAP["7"])
+        source_type = SOURCE_TYPE_MAP.get(code, "unknow")
 
     raw_date = safe_get(parts, 1)
     date_human = transform_date(raw_date) if raw_date else "0000-01-01 00:00:00"
