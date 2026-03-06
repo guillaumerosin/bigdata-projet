@@ -512,40 +512,40 @@ def task_parse_messages(**context):
     if not messages:
         log.info("Aucun message à parser (XCom vide).")
         return []
-    # Log des 100 premières valeurs brutes de la colonne dates(dans texte) depuis Kafka.
-    # Attention: parts[...] est indexé à partir de 0 (la "16e colonne" == parts[15]).
-    log.info("=== 100 premières lignes Kafka — debug dates(dans texte) ===")
+    # Debug: log des 100 premières valeurs brutes (Kafka) pour aider à vérifier les index
+    log.info("=== Debug Kafka (100 premières lignes) — champs bruts ===")
     for i, raw in enumerate(messages[:100]):
         parts = raw.split("\t")
-        # Pour aider à diagnostiquer un décalage d'index, on log aussi parts[15] et parts[17] sur les 10 premières lignes.
-        col_15 = safe_get(parts, 15)
-        col_16 = safe_get(parts, 16)
-        col_17 = safe_get(parts, 17)
-        if i < 10:
-            log.info(
-                "Kafka ligne %d — len(parts)=%d | parts[15]=%r | parts[16]=%r | parts[17]=%r",
-                i + 1,
-                len(parts),
-                col_15[:200] if col_15 and len(col_15) > 200 else col_15,
-                col_16[:200] if col_16 and len(col_16) > 200 else col_16,
-                col_17[:200] if col_17 and len(col_17) > 200 else col_17,
-            )
-        else:
-            # Log principal (si tu confirmes que l'index correct est 16, regarde cette colonne)
-            log.info(
-                "Kafka ligne %d — parts[16] = %r",
-                i + 1,
-                col_16[:200] if col_16 and len(col_16) > 200 else col_16,
-            )
-    log.info("=== Fin des 100 premières lignes dates(dans texte) ===")
+        v2locations_raw = safe_get(parts, 10)
+        tone_raw = safe_get(parts, 12)          # v1.5tone brut
+        v2gcam_raw = safe_get(parts, 14)         # v2GCAM brut
+        dates_raw = safe_get(parts, 16)          # dates(dans texte) brut
+        numeric_raw_guess = safe_get(parts, 17)  # hypothèse "valeurs numériques" (à confirmer)
+        extraxml_raw = safe_get(parts, 26)       # extraxml brut (souvent très long)
+
+        def _cut(s: str | None, n: int = 200):
+            if not s:
+                return s
+            return s[:n] + "…" if len(s) > n else s
+
+        log.info(
+            "Kafka ligne %d — len(parts)=%d | v2locations=%r | v1.5tone=%r | v2GCAM=%r | dates_txt=%r | numeric?=%r | extraxml=%r",
+            i + 1,
+            len(parts),
+            _cut(v2locations_raw),
+            _cut(tone_raw),
+            _cut(v2gcam_raw),
+            _cut(dates_raw),
+            _cut(numeric_raw_guess),
+            _cut(extraxml_raw),
+        )
+    log.info("=== Fin debug Kafka (100 premières lignes) ===")
     result = []
     for raw in messages:
         parsed = my_process_data(raw)
         if parsed is not None:
             result.append(parsed)
     log.info("Parsing terminé : %d messages valides sur %d.", len(result), len(messages))
-    # if result:
-    #     log.info("Exemple 1er message parsé: %s", result[0])  # debug
     return result
 
 
