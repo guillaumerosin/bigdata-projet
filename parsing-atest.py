@@ -204,15 +204,12 @@ def transform_v2gcam(raw: str) -> str:
 
 
 def transform_v2dates(raw: str) -> str:
-    """Transforme le champ 'dates_dans_texte' en dates lisibles à partir du format GDELT."""
     if not raw:
         return "NA"
     blocks = [b.strip() for b in str(raw).split(";") if b.strip()]
     results: list[str] = []
     for block in blocks:
         parts = [p for p in block.split("#") if p != ""]
-        # if len(parts) != 5:
-            #continue
         try:
             res, mo, d, y, offset = (
                 int(parts[0]),
@@ -222,30 +219,21 @@ def transform_v2dates(raw: str) -> str:
                 int(parts[4]),
             )
             if res == 1:
-                date_str = f"{y:04d}0000000000"
+                date_str = f"00-00-{y:04d}"
             elif res == 2:
-                date_str = f"{y:04d}{mo:02d}00000000"
+                date_str = f"00-{mo:02d}-{y:04d}"
             elif res == 3:
-                date_str = f"{y:04d}{mo:02d}{d:02d}000000"
+                date_str = f"{d:02d}-{mo:02d}-{y:04d}"
             elif res == 4:
-                date_str = f"0000{mo:02d}{d:02d}000000"
+                date_str = f"{d:02d}-{mo:02d}-0000"
             else:
-                date_str = "00000000000000"
-            pos = (
-                "titre/intro"
-                if offset < 200
-                else "corps"
-                if offset < 1000
-                else "conclusion"
-            )
-            results.append(f"{date_str} (position {offset}, {pos})")
+                date_str = "00-00-0000"
+            results.append(date_str)
         except Exception:
             continue
     if not results:
         return "NA"
-    return f"{len(results)} date(s) mentionnée(s) :\n" + "\n".join(
-        f"  • {r}" for r in results
-    )
+    return "\n".join(results)
 
 
 def _get_cluster():
@@ -514,7 +502,7 @@ def task_parse_messages(**context):
         return []
     # Debug: log des 100 premières valeurs brutes (Kafka) pour aider à vérifier les index
     log.info("=== Debug Kafka (100 premières lignes) — champs bruts ===")
-    for i, raw in enumerate(messages[:100]):
+    for i, raw in enumerate(messages[:20]):
         parts = raw.split("\t")
         v2locations_raw = safe_get(parts, 10)
         tone_raw = safe_get(parts, 12)          # v1.5tone brut
