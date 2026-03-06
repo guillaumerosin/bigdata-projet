@@ -30,6 +30,15 @@ SOURCE_TYPE_MAP = {
     "5": "Jstor",
     "6": "Nontextualsource",
 }
+
+# Types de localisation GDELT (LocationType)
+LOCATION_TYPE_MAP = {
+    1: "Pays",
+    2: "Région / État / Province",
+    3: "Ville",
+    4: "Point d'intérêt",
+    5: "Entité mondiale",
+}
 def transform_date(raw: str) -> str:
     """
     Transforme une date GDELT de type YYYYMMDDHHMMSS (parfois partielle ou collée à d'autres caractères)
@@ -234,6 +243,51 @@ def transform_v2dates(raw: str) -> str:
     if not results:
         return "NA"
     return "\n".join(results)
+
+
+def transform_v2locations(raw: str) -> str:
+    if not raw:
+        return "NA"
+    blocks = [b.strip() for b in raw.split(";") if b.strip()]
+
+    seen = set()
+    results: list[str] = []
+    for block in blocks:
+        parts = block.split("#")
+        if len(parts) < 3:
+            continue
+        try:
+            lt = LOCATION_TYPE_MAP.get(int(parts[0]), f"Type {parts[0]}")
+            full_name = parts[1].strip()          # ex: "Iranian", "American"
+            country = parts[2].strip()            # ex: "IR", "US"
+            lat = parts[5].strip() if len(parts) > 5 and parts[5] else None
+            lon = parts[6].strip() if len(parts) > 6 and parts[6] else None
+
+            # Normalisation très simple du nom pour les pays
+            norm_name = full_name
+            if lt == "Pays":
+                # enlève un 's' final ou 'ans' final, si même code pays
+                if norm_name.lower().endswith("ans"):
+                    norm_name = norm_name[:-3]
+                elif norm_name.lower().endswith("s"):
+                    norm_name = norm_name[:-1]
+
+            key = (lt, norm_name.lower(), country, lat, lon)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            s = f"{lt} : {norm_name} ({country})"
+            if lat and lon:
+                s += f" — coordonnées : {lat}°N, {lon}°E"
+            results.append(s)
+        except Exception:
+            continue
+
+    if not results:
+        return "NA"
+
+    return f"{len(results)} localisation(s) :\n" + "\n".join(f"- {r}" for r in results)
 
 
 def _get_cluster():
@@ -441,7 +495,7 @@ def my_process_data(raw: str) -> dict | None:
         "source_id":        safe_get(parts, 4),
         "v1themes":         safe_get(parts, 7),
         "v2themes":         safe_get(parts, 8),
-        "v2locations":      safe_get(parts, 10),
+        "v2locations":      transform_v2locations(safe_get(parts, 10)),
         "v1persons":        safe_get(parts, 11),
         "v1organizations":  safe_get(parts, 13),
         "tone":             tone,
