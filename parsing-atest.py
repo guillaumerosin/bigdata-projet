@@ -598,12 +598,36 @@ def task_parse_messages(**context):
             len(parts),
             _cut(v2gcam_raw),
         )
-    result = []
+    result: list[dict] = []
     for raw in messages:
         parsed = my_process_data(raw)
         if parsed is not None:
             result.append(parsed)
+
     log.info("Parsing terminé : %d messages valides sur %d.", len(result), len(messages))
+
+    # Statistiques de NA par colonne (sur les messages parsés)
+    if result:
+        total = len(result)
+        keys = list(result[0].keys())
+        na_counts: dict[str, int] = {k: 0 for k in keys}
+
+        for row in result:
+            for k in keys:
+                v = row.get(k)
+                if v is None:
+                    na_counts[k] += 1
+                else:
+                    s = str(v).strip()
+                    if s == "" or s.upper() == "NA":
+                        na_counts[k] += 1
+
+        log.info("=== Statistiques NA par colonne (sur %d lignes) ===", total)
+        for k in keys:
+            cnt = na_counts.get(k, 0)
+            pct = (cnt / total) * 100 if total > 0 else 0.0
+            log.info("Colonne %s : %d NA (%.2f%%)", k, cnt, pct)
+
     return result
 
 
@@ -627,7 +651,8 @@ def task_insert_to_scylla(**context):
 
 with DAG(
     dag_id="a1_scylladb_main_parsing",
-    schedule=None,
+    # Lancement automatique toutes les 15 minutes
+    schedule="*/15 * * * *",
     start_date=datetime(2026, 2, 27),
     catchup=False,
 ) as dag:
@@ -656,5 +681,4 @@ with DAG(
         task_id="insertion_scylla",
         python_callable=task_insert_to_scylla,
     )
-    # Ordre des tâches (graphe inchangé : 5 nœuds)
     connexion_task >> create_task >> read_kafka_task >> parse_task >> insert_task
