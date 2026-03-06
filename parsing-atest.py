@@ -46,22 +46,22 @@ def transform_date(raw: str) -> str:
     return f"{y}-{m}-{d} {hh}:{mm}:{ss}"
 
 def transform_v15tone(raw: str) -> str:
-    """Parse le champ tone v1.5 (tone,pos,neg,pol,act,self,wc) et retourne un libellé lisible."""
     if not raw:
         return "NA"
-    raw = raw.strip()
-    if not raw:
-        return "NA"
-    parts = raw.split(",")
+    parts = raw.strip().split(",")
     if len(parts) != 7:
-        return f"Format invalide ({len(parts)} valeurs, attendu 7)."
+        return f"Format invalide ({len(parts)} valeurs attendu 7)."
     try:
         tone, pos, neg, pol, act, self_, wc = (
-            float(parts[0]), float(parts[1]), float(parts[2]),
-            float(parts[3]), float(parts[4]), float(parts[5]),
-            int(float(parts[6]))
+            float(parts[0]),
+            float(parts[1]),
+            float(parts[2]),
+            float(parts[3]),
+            float(parts[4]),
+            float(parts[5]),
+            int(float(parts[6])),
         )
-    except (ValueError, TypeError):
+    except Exception:
         return "NA"
 
     if tone < -10:
@@ -84,13 +84,31 @@ def transform_v15tone(raw: str) -> str:
         tl = "extrêmement positif"
 
     vocab = (
-        f"vocabulaire négatif dominant ({neg}% vs {pos}%)" if neg > pos + 1 else
-        f"vocabulaire positif dominant ({pos}% vs {neg}%)" if pos > neg + 1 else
-        f"vocabulaire équilibré (positif {pos}%, négatif {neg}%)"
+        f"vocabulaire négatif dominant ({neg}% vs {pos}%)"
+        if neg > pos + 1
+        else f"vocabulaire positif dominant ({pos}% vs {neg}%)"
+        if pos > neg + 1
+        else f"vocabulaire équilibré (positif {pos}%, négatif {neg}%)"
     )
     al = "très actif" if act >= 8 else "modérément actif" if act >= 3 else "passif"
-    sl = "subjectif" if self_ >= 2 else "légèrement personnel" if self_ >= 0.5 else "impersonnel"
-    wl = "très court" if wc < 100 else "court" if wc < 300 else "standard" if wc < 800 else "long" if wc < 2000 else "très long"
+    sl = (
+        "subjectif"
+        if self_ >= 2
+        else "légèrement personnel"
+        if self_ >= 0.5
+        else "impersonnel"
+    )
+    wl = (
+        "très court"
+        if wc < 100
+        else "court"
+        if wc < 300
+        else "standard"
+        if wc < 800
+        else "long"
+        if wc < 2000
+        else "très long"
+    )
 
     return (
         f"Ton {tl} (score = {tone}). {vocab.capitalize()}. "
