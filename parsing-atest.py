@@ -425,7 +425,6 @@ def my_process_data(raw: str) -> dict | None:
     # GDELT GKG v2.1 : V2Tone est en colonne 15 (0‑based)
     raw_tone = safe_get(parts, 15)
     tone = transform_v15tone(raw_tone) if raw_tone else " "
-    log.info("Tone brut (col 15 Kafka/V2Tone) = %r -> interprété = %s", raw_tone, tone)
 
     raw_dates = safe_get(parts, 16)
     dates_dt = transform_v2dates(raw_dates) if raw_dates else " "
@@ -433,11 +432,6 @@ def my_process_data(raw: str) -> dict | None:
     # GDELT GKG v2.1 : V2GCAM est en colonne 17 (0‑based)
     raw_v2gcam = safe_get(parts, 17)
     v2gcam = transform_v2gcam(raw_v2gcam) if raw_v2gcam else "NA"
-    log.info(
-        "V2GCAM brut (col 17 Kafka/V2GCAM) = %r -> interprété (résumé) = %s",
-        raw_v2gcam,
-        (v2gcam[:40] + "…") if isinstance(v2gcam, str) and len(v2gcam) > 40 else v2gcam,
-    )
 
     msg = {
         "id":               safe_get(parts, 0),
@@ -521,16 +515,10 @@ def task_parse_messages(**context):
     if not messages:
         log.info("Aucun message à parser (XCom vide).")
         return []
-    # Debug: log des 100 premières valeurs brutes (Kafka) pour aider à vérifier les index
-    log.info("=== Debug Kafka (100 premières lignes) — champs bruts ===")
-    for i, raw in enumerate(messages[:20]):
+    # Debug léger : on log uniquement V2GCAM pour quelques premières lignes
+    for i, raw in enumerate(messages[:3]):
         parts = raw.split("\t")
-        v2locations_raw = safe_get(parts, 10)
-        tone_raw = safe_get(parts, 15)          # V2Tone (7 valeurs numériques)
         v2gcam_raw = safe_get(parts, 17)        # V2GCAM brut
-        dates_raw = safe_get(parts, 16)         # dates(dans texte) brut
-        numeric_raw_guess = safe_get(parts, 24) # Amounts (valeurs numériques) si présent
-        extraxml_raw = safe_get(parts, 26)      # extraxml brut (souvent très long)
 
         def _cut(s: str | None, n: int = 200):
             if not s:
@@ -538,23 +526,11 @@ def task_parse_messages(**context):
             return s[:n] + "…" if len(s) > n else s
 
         log.info(
-            "Kafka ligne %d — len(parts)=%d | v2locations=%r | v1.5tone=%r | v2GCAM=%r | dates_txt=%r | numeric?=%r | extraxml=%r",
+            "Kafka V2GCAM debug ligne %d — len(parts)=%d | V2GCAM brut=%r",
             i + 1,
             len(parts),
-            _cut(v2locations_raw),
-            _cut(tone_raw),
             _cut(v2gcam_raw),
-            _cut(dates_raw),
-            _cut(numeric_raw_guess),
-            _cut(extraxml_raw),
         )
-        # Pour la toute première ligne, on logue un dump colonne par colonne
-        if i == 0:
-            log.info("=== Dump détaillé colonnes Kafka pour la première ligne ===")
-            for idx, val in enumerate(parts):
-                log.info("Col %02d = %r", idx, _cut(val, 120))
-            log.info("=== Fin dump détaillé colonnes Kafka (ligne 1) ===")
-    log.info("=== Fin debug Kafka (100 premières lignes) ===")
     result = []
     for raw in messages:
         parsed = my_process_data(raw)
