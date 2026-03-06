@@ -22,7 +22,8 @@ fi
 
 JAR="${HADOOP_STREAMING_JAR:-}"
 if [[ -z "$JAR" ]]; then
-  for p in /opt/hadoop/share/hadoop/tools/lib/hadoop-streaming*.jar \
+  for p in /opt/hadoop-3.2.1/share/hadoop/tools/lib/hadoop-streaming-3.2.1.jar \
+           /opt/hadoop/share/hadoop/tools/lib/hadoop-streaming*.jar \
            /usr/lib/hadoop-mapreduce/hadoop-streaming*.jar \
            /usr/lib/hadoop/tools/lib/hadoop-streaming*.jar; do
     if [[ -f $p ]]; then
@@ -31,7 +32,7 @@ if [[ -z "$JAR" ]]; then
     fi
   done
 fi
-[[ -z "$JAR" ]] && JAR=$(find /opt /usr -name "*streaming*.jar" 2>/dev/null | head -1)
+[[ -z "$JAR" ]] && JAR=$(find /opt /usr -name "*streaming*.jar" -path "*/tools/lib/*" 2>/dev/null | head -1)
 if [[ -z "$JAR" ]] || [[ ! -f "$JAR" ]]; then
   echo "Erreur: hadoop-streaming.jar non trouvé. Définir HADOOP_STREAMING_JAR ou lancer:" >&2
   echo "  find / -name '*streaming*.jar' 2>/dev/null" >&2
