@@ -422,14 +422,16 @@ def my_process_data(raw: str) -> dict | None:
     raw_date = safe_get(parts, 1)
     date_human = transform_date(raw_date) if raw_date else "0000-01-01 00:00:00"
 
-    raw_tone = safe_get(parts, 12)
+    # GDELT GKG v2.1 : V2Tone est en colonne 15 (0‑based)
+    raw_tone = safe_get(parts, 15)
     tone = transform_v15tone(raw_tone) if raw_tone else " "
-    log.info("Tone brut (col 12 Kafka) = %r -> interprété = %s", raw_tone, tone)
+    log.info("Tone brut (col 15 Kafka/V2Tone) = %r -> interprété = %s", raw_tone, tone)
 
     raw_dates = safe_get(parts, 16)
     dates_dt = transform_v2dates(raw_dates) if raw_dates else " "
 
-    raw_v2gcam = safe_get(parts, 14)
+    # GDELT GKG v2.1 : V2GCAM est en colonne 17 (0‑based)
+    raw_v2gcam = safe_get(parts, 17)
     v2gcam = transform_v2gcam(raw_v2gcam) if raw_v2gcam else "NA"
 
     msg = {
@@ -456,6 +458,19 @@ def my_process_data(raw: str) -> dict | None:
 
 def insertion_scylla(session, msg: dict) -> None:
     """Insère un article dans la table gdelt.articles."""
+    # Log de ce qui va réellement être écrit en base (utile pour vérifier "tone")
+    try:
+        log.info(
+            "Insertion Scylla id=%r | tone=%r | source=%r | date=%r",
+            msg.get("id"),
+            msg.get("tone"),
+            msg.get("source"),
+            msg.get("date"),
+        )
+    except Exception:
+        # En cas de dict incomplet ou non sérialisable, on ne bloque pas l'insert
+        log.warning("Impossible de logger le msg avant insertion Scylla", exc_info=True)
+
     session.execute(
         """
         INSERT INTO gdelt.articles (
@@ -506,10 +521,10 @@ def task_parse_messages(**context):
     for i, raw in enumerate(messages[:20]):
         parts = raw.split("\t")
         v2locations_raw = safe_get(parts, 10)
-        tone_raw = safe_get(parts, 12)          # supposé v1.5tone brut (à vérifier)
-        v2gcam_raw = safe_get(parts, 14)        # supposé v2GCAM brut (à vérifier)
-        dates_raw = safe_get(parts, 16)         # supposé dates(dans texte) brut (à vérifier)
-        numeric_raw_guess = safe_get(parts, 17) # hypothèse "valeurs numériques" (à confirmer)
+        tone_raw = safe_get(parts, 15)          # V2Tone (7 valeurs numériques)
+        v2gcam_raw = safe_get(parts, 17)        # V2GCAM brut
+        dates_raw = safe_get(parts, 16)         # dates(dans texte) brut
+        numeric_raw_guess = safe_get(parts, 24) # Amounts (valeurs numériques) si présent
         extraxml_raw = safe_get(parts, 26)      # extraxml brut (souvent très long)
 
         def _cut(s: str | None, n: int = 200):
