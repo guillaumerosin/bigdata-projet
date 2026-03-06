@@ -437,7 +437,7 @@ def my_process_data(raw: str) -> dict | None:
     raw_tone = safe_get(parts, 12)
     tone = transform_v15tone(raw_tone) if raw_tone else " "
 
-    raw_dates = safe_get(parts, 13)
+    raw_dates = safe_get(parts, 16)
     dates_dt = transform_v2dates(raw_dates) if raw_dates else " "
 
     raw_v2gcam = safe_get(parts, 14)
