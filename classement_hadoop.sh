@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Classement des sources par nombre de news — MapReduce Hadoop / YARN (bash)
 # Utilise mapreduce/mapper.sh et mapreduce/reducer.sh (awk, pas de Python).
 # À lancer dans le conteneur namenode.
@@ -14,32 +14,37 @@ TOP_N="${1:-20}"
 MAPPER="${SCRIPT_DIR}/mapreduce/mapper.sh"
 REDUCER="${SCRIPT_DIR}/mapreduce/reducer.sh"
 
-if [[ ! -f "$MAPPER" ]] || [[ ! -f "$REDUCER" ]]; then
+if [ ! -f "$MAPPER" ] || [ ! -f "$REDUCER" ]; then
   echo "Erreur: mapper.sh ou reducer.sh manquant dans mapreduce/" >&2
   echo "TEMPS: -1.000"
   exit 1
 fi
 
-JAR="${HADOOP_STREAMING_JAR:-}"
-if [[ -z "$JAR" ]]; then
-  for p in /opt/hadoop-3.2.1/share/hadoop/tools/lib/hadoop-streaming-3.2.1.jar \
-           /opt/hadoop/share/hadoop/tools/lib/hadoop-streaming*.jar \
-           /usr/lib/hadoop-mapreduce/hadoop-streaming*.jar \
-           /usr/lib/hadoop/tools/lib/hadoop-streaming*.jar; do
-    if [[ -f $p ]]; then
+# Chemin connu pour l'image BDE hadoop-namenode 2.0.0-hadoop3.2.1
+JAR="${HADOOP_STREAMING_JAR}"
+if [ -z "$JAR" ] && [ -f "/opt/hadoop-3.2.1/share/hadoop/tools/lib/hadoop-streaming-3.2.1.jar" ]; then
+  JAR="/opt/hadoop-3.2.1/share/hadoop/tools/lib/hadoop-streaming-3.2.1.jar"
+fi
+if [ -z "$JAR" ]; then
+  for p in /opt/hadoop/share/hadoop/tools/lib/hadoop-streaming*.jar \
+           /usr/lib/hadoop-mapreduce/hadoop-streaming*.jar; do
+    if [ -f "$p" ]; then
       JAR="$p"
       break
     fi
   done
 fi
-[[ -z "$JAR" ]] && JAR=$(find /opt /usr -name "*streaming*.jar" -path "*/tools/lib/*" 2>/dev/null | head -1)
-if [[ -z "$JAR" ]] || [[ ! -f "$JAR" ]]; then
-  echo "Erreur: hadoop-streaming.jar non trouvé. Définir HADOOP_STREAMING_JAR ou lancer:" >&2
-  echo "  find / -name '*streaming*.jar' 2>/dev/null" >&2
+if [ -z "$JAR" ]; then
+  JAR=$(find /opt /usr -name "*streaming*.jar" -path "*/tools/lib/*" 2>/dev/null | head -1)
+fi
+if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
+  echo "Erreur: hadoop-streaming.jar non trouvé. Définir:" >&2
+  echo "  export HADOOP_STREAMING_JAR=/opt/hadoop-3.2.1/share/hadoop/tools/lib/hadoop-streaming-3.2.1.jar" >&2
   echo "TEMPS: -1.000"
   exit 1
 fi
 
+echo "Using JAR: $JAR" >&2
 OUT="${HADOOP_OUTPUT}_$(date +%s)"
 START=$(date +%s.%N)
 
