@@ -433,6 +433,11 @@ def my_process_data(raw: str) -> dict | None:
     # GDELT GKG v2.1 : V2GCAM est en colonne 17 (0‑based)
     raw_v2gcam = safe_get(parts, 17)
     v2gcam = transform_v2gcam(raw_v2gcam) if raw_v2gcam else "NA"
+    log.info(
+        "V2GCAM brut (col 17 Kafka/V2GCAM) = %r -> interprété (résumé) = %s",
+        raw_v2gcam,
+        (v2gcam[:200] + "…") if isinstance(v2gcam, str) and len(v2gcam) > 200 else v2gcam,
+    )
 
     msg = {
         "id":               safe_get(parts, 0),
