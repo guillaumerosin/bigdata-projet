@@ -245,6 +245,16 @@ def transform_v2dates(raw: str) -> str:
     return "\n".join(results)
 
 
+def transform_list_field(raw: str, label: str) -> str:
+    if not raw:
+        return "NA"
+    items = [i.strip() for i in str(raw).split(";") if i.strip()]
+    if not items:
+        return "NA"
+    r = f"{len(items)} {label}(s) : {', '.join(items[:10])}"
+    return r + (" [...]" if len(items) > 10 else ".")
+
+
 def transform_v2locations(raw: str) -> str:
     if not raw:
         return "NA"
@@ -487,6 +497,9 @@ def my_process_data(raw: str) -> dict | None:
     raw_v2gcam = safe_get(parts, 17)
     v2gcam = transform_v2gcam(raw_v2gcam) if raw_v2gcam else "NA"
 
+    # GDELT GKG v2.1 : Amounts (valeurs numériques) en colonne 24 (0-based)
+    raw_numeric = safe_get(parts, 24)
+
     msg = {
         "id":               safe_get(parts, 0),
         "date":             date_human,
@@ -494,16 +507,16 @@ def my_process_data(raw: str) -> dict | None:
         "source":           safe_get(parts, 3),
         "source_id":        safe_get(parts, 4),
         "v1themes":         safe_get(parts, 7),
-        "v2themes":         safe_get(parts, 8),
+        "v2themes":         transform_list_field(safe_get(parts, 8), "thème v2"),
         "v2locations":      transform_v2locations(safe_get(parts, 10)),
-        "v1persons":        safe_get(parts, 11),
-        "v1organizations":  safe_get(parts, 13),
+        "v1persons":        transform_list_field(safe_get(parts, 11), "personne"),
+        "v1organizations":  transform_list_field(safe_get(parts, 13), "organisation"),
         "tone":             tone,
         "dates_dans_texte": dates_dt,
         "v2GCAM":           v2gcam,
         "image":            safe_get(parts, 18),
         "videos":           safe_get(parts, 21),
-        "valeurs_numeriques": "temp",
+        "valeurs_numeriques": raw_numeric,
         "extraxml":         safe_get(parts, 26),
     }
     return msg
