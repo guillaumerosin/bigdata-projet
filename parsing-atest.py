@@ -512,6 +512,13 @@ def task_parse_messages(**context):
     if not messages:
         log.info("Aucun message à parser (XCom vide).")
         return []
+    # Log des 100 premières valeurs brutes de la colonne dates(dans texte) [index 13] depuis Kafka
+    log.info("=== 100 premières lignes Kafka — colonne dates(dans texte) [parts[13]] ===")
+    for i, raw in enumerate(messages[:100]):
+        parts = raw.split("\t")
+        col_dates = safe_get(parts, 13)
+        log.info("Kafka ligne %d — dates(dans texte) = %r", i + 1, col_dates[:200] if col_dates and len(col_dates) > 200 else col_dates)
+    log.info("=== Fin des 100 premières lignes dates(dans texte) ===")
     result = []
     for raw in messages:
         parsed = my_process_data(raw)
