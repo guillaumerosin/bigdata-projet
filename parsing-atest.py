@@ -512,12 +512,31 @@ def task_parse_messages(**context):
     if not messages:
         log.info("Aucun message à parser (XCom vide).")
         return []
-    # Log des 100 premières valeurs brutes de la colonne dates(dans texte) [index 13] depuis Kafka
-    log.info("=== 100 premières lignes Kafka — colonne dates(dans texte) [parts[13]] ===")
+    # Log des 100 premières valeurs brutes de la colonne dates(dans texte) depuis Kafka.
+    # Attention: parts[...] est indexé à partir de 0 (la "16e colonne" == parts[15]).
+    log.info("=== 100 premières lignes Kafka — debug dates(dans texte) ===")
     for i, raw in enumerate(messages[:100]):
         parts = raw.split("\t")
-        col_dates = safe_get(parts, 13)
-        log.info("Kafka ligne %d — dates(dans texte) = %r", i + 1, col_dates[:200] if col_dates and len(col_dates) > 200 else col_dates)
+        # Pour aider à diagnostiquer un décalage d'index, on log aussi parts[15] et parts[17] sur les 10 premières lignes.
+        col_15 = safe_get(parts, 15)
+        col_16 = safe_get(parts, 16)
+        col_17 = safe_get(parts, 17)
+        if i < 10:
+            log.info(
+                "Kafka ligne %d — len(parts)=%d | parts[15]=%r | parts[16]=%r | parts[17]=%r",
+                i + 1,
+                len(parts),
+                col_15[:200] if col_15 and len(col_15) > 200 else col_15,
+                col_16[:200] if col_16 and len(col_16) > 200 else col_16,
+                col_17[:200] if col_17 and len(col_17) > 200 else col_17,
+            )
+        else:
+            # Log principal (si tu confirmes que l'index correct est 16, regarde cette colonne)
+            log.info(
+                "Kafka ligne %d — parts[16] = %r",
+                i + 1,
+                col_16[:200] if col_16 and len(col_16) > 200 else col_16,
+            )
     log.info("=== Fin des 100 premières lignes dates(dans texte) ===")
     result = []
     for raw in messages:
