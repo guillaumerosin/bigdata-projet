@@ -207,12 +207,12 @@ def transform_v2dates(raw: str) -> str:
     """Transforme le champ 'dates_dans_texte' en dates lisibles à partir du format GDELT."""
     if not raw:
         return "NA"
-    blocks = [b.strip() for b in str(raw).split(";#") if b.strip()]
+    blocks = [b.strip() for b in str(raw).split(";") if b.strip()]
     results: list[str] = []
     for block in blocks:
         parts = [p for p in block.split("#") if p != ""]
-        if len(parts) != 5:
-            continue
+        # if len(parts) != 5:
+            #continue
         try:
             res, mo, d, y, offset = (
                 int(parts[0]),
