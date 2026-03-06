@@ -21,10 +21,20 @@ if [[ ! -f "$MAPPER" ]] || [[ ! -f "$REDUCER" ]]; then
 fi
 
 JAR="${HADOOP_STREAMING_JAR:-}"
-[[ -z "$JAR" ]] && JAR=$(find /usr -name "hadoop-streaming*.jar" 2>/dev/null | head -1)
-[[ -z "$JAR" ]] && JAR=$(find /opt -name "hadoop-streaming*.jar" 2>/dev/null | head -1)
+if [[ -z "$JAR" ]]; then
+  for p in /opt/hadoop/share/hadoop/tools/lib/hadoop-streaming*.jar \
+           /usr/lib/hadoop-mapreduce/hadoop-streaming*.jar \
+           /usr/lib/hadoop/tools/lib/hadoop-streaming*.jar; do
+    if [[ -f $p ]]; then
+      JAR="$p"
+      break
+    fi
+  done
+fi
+[[ -z "$JAR" ]] && JAR=$(find /opt /usr -name "*streaming*.jar" 2>/dev/null | head -1)
 if [[ -z "$JAR" ]] || [[ ! -f "$JAR" ]]; then
-  echo "Erreur: hadoop-streaming.jar non trouvé" >&2
+  echo "Erreur: hadoop-streaming.jar non trouvé. Définir HADOOP_STREAMING_JAR ou lancer:" >&2
+  echo "  find / -name '*streaming*.jar' 2>/dev/null" >&2
   echo "TEMPS: -1.000"
   exit 1
 fi
