@@ -29,6 +29,7 @@ SOURCE_TYPE_MAP = {
     "4": "Dtic",
     "5": "Jstor",
     "6": "Nontextualsource",
+    "7": "unknow",
 }
 def transform_date(raw: str) -> str:
     """
