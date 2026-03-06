@@ -519,7 +519,7 @@ def my_process_data(raw: str) -> dict | None:
 
 
 def insertion_scylla(session, msg: dict) -> None:
-    """Insère un article dans la table gdelt.articles. IF NOT EXISTS évite les doublons (même id)."""
+    """Insère un article dans la table gdelt.articles. Même id = écrasement (une seule ligne par id, pas de LWT)."""
     session.execute(
         """
         INSERT INTO gdelt.articles (
@@ -534,7 +534,7 @@ def insertion_scylla(session, msg: dict) -> None:
             %s, %s,
             %s, %s, %s,
             %s, %s, %s, %s
-        ) IF NOT EXISTS
+        )
         """,
         (
             msg["id"],
