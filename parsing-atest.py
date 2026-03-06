@@ -506,11 +506,11 @@ def task_parse_messages(**context):
     for i, raw in enumerate(messages[:20]):
         parts = raw.split("\t")
         v2locations_raw = safe_get(parts, 10)
-        tone_raw = safe_get(parts, 12)          # v1.5tone brut
-        v2gcam_raw = safe_get(parts, 14)         # v2GCAM brut
-        dates_raw = safe_get(parts, 16)          # dates(dans texte) brut
-        numeric_raw_guess = safe_get(parts, 17)  # hypothèse "valeurs numériques" (à confirmer)
-        extraxml_raw = safe_get(parts, 26)       # extraxml brut (souvent très long)
+        tone_raw = safe_get(parts, 12)          # supposé v1.5tone brut (à vérifier)
+        v2gcam_raw = safe_get(parts, 14)        # supposé v2GCAM brut (à vérifier)
+        dates_raw = safe_get(parts, 16)         # supposé dates(dans texte) brut (à vérifier)
+        numeric_raw_guess = safe_get(parts, 17) # hypothèse "valeurs numériques" (à confirmer)
+        extraxml_raw = safe_get(parts, 26)      # extraxml brut (souvent très long)
 
         def _cut(s: str | None, n: int = 200):
             if not s:
@@ -528,6 +528,12 @@ def task_parse_messages(**context):
             _cut(numeric_raw_guess),
             _cut(extraxml_raw),
         )
+        # Pour la toute première ligne, on logue un dump colonne par colonne
+        if i == 0:
+            log.info("=== Dump détaillé colonnes Kafka pour la première ligne ===")
+            for idx, val in enumerate(parts):
+                log.info("Col %02d = %r", idx, _cut(val, 120))
+            log.info("=== Fin dump détaillé colonnes Kafka (ligne 1) ===")
     log.info("=== Fin debug Kafka (100 premières lignes) ===")
     result = []
     for raw in messages:
