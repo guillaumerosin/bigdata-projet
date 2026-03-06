@@ -18,8 +18,6 @@ PROTOCOL_VERSION = 4
 
 KAFKA_TOPIC = "test"
 KAFKA_BOOTSTRAP = ["172.20.0.51:9092","172.20.0.52:9092"]
-# Groupe Kafka fixe : les offsets sont sauvegardés, on ne relit jamais les mêmes messages
-KAFKA_GROUP_ID = "gdelt_scylla_ingest"
 
 MIN_COLUMNS = 27
 
@@ -432,130 +430,25 @@ def create_db():
 
 
 def read_kafka_for_scylla():
-    """
-    Lit Kafka avec consumer group (KAFKA_GROUP_ID) pour éviter la double ingestion.
-    Retourne messages + offsets à commiter après insertion (passés via XCom aux tâches suivantes).
-    """
     from kafka import KafkaConsumer
 
     consumer = KafkaConsumer(
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
-        group_id=KAFKA_GROUP_ID,
+        auto_offset_reset="earliest",
         enable_auto_commit=False,
-        auto_offset_reset="latest",
+        group_id=None,
         consumer_timeout_ms=10000,
     )
     messages = []
-    # Dernier offset lu par partition (pour commit : next offset = last + 1)
-    last_offsets = {}  # (topic, partition) -> offset
-
     for msg in consumer:
         raw = msg.value.decode("utf-8", errors="replace")
         messages.append(raw)
-        key = (msg.topic, msg.partition)
-        last_offsets[key] = msg.offset + 1  # offset à commiter = prochaine position
 
     consumer.close()
+    log.info("%d messages lus depuis Kafka", len(messages))
+    return messages
 
-    # Offsets sérialisables pour XCom (topic, partition, offset)
-    offsets_serializable = [
-        {"topic": t, "partition": p, "offset": last_offsets[(t, p)]}
-        for t, p in sorted(last_offsets.keys())
-    ]
-
-    log.info("%d messages lus depuis Kafka (groupe %s)", len(messages), KAFKA_GROUP_ID)
-    return {"messages": messages, "offsets": offsets_serializable}
-
-
-def run_ingest_from_kafka(**context):
-    """
-    Tâche unique : lit Kafka (consumer group), parse, insère en Scylla, puis commit les offsets.
-    Ainsi on ne relit jamais les mêmes messages (pas de double ingestion).
-    """
-    from kafka import KafkaConsumer
-
-    consumer = KafkaConsumer(
-        KAFKA_TOPIC,
-        bootstrap_servers=KAFKA_BOOTSTRAP,
-        group_id=KAFKA_GROUP_ID,
-        enable_auto_commit=False,
-        auto_offset_reset="latest",
-        consumer_timeout_ms=10000,
-    )
-    messages = []
-    for msg in consumer:
-        raw = msg.value.decode("utf-8", errors="replace")
-        messages.append(raw)
-
-    log.info("%d messages lus depuis Kafka (groupe %s)", len(messages), KAFKA_GROUP_ID)
-
-    if not messages:
-        consumer.close()
-        log.info("Aucun nouveau message, rien à insérer.")
-        return
-
-    # Parse
-    result = []
-    for raw in messages:
-        parsed = my_process_data(raw)
-        if parsed is not None:
-            result.append(parsed)
-
-    log.info("Parsing terminé : %d messages valides sur %d.", len(result), len(messages))
-
-    # Debug V2GCAM (3 premières lignes)
-    for i, raw in enumerate(messages[:3]):
-        parts = raw.split("\t")
-        v2gcam_raw = safe_get(parts, 17)
-
-        def _cut(s, n=200):
-            if not s:
-                return s
-            return s[:n] + "…" if len(s) > n else s
-
-        log.info(
-            "Kafka V2GCAM debug ligne %d — len(parts)=%d | V2GCAM brut=%r",
-            i + 1, len(parts), _cut(v2gcam_raw),
-        )
-
-    # Stats NA par colonne
-    if result:
-        total = len(result)
-        keys = list(result[0].keys())
-        na_counts = {k: 0 for k in keys}
-        for row in result:
-            for k in keys:
-                v = row.get(k)
-                if v is None:
-                    na_counts[k] += 1
-                else:
-                    s = str(v).strip()
-                    if s == "" or s.upper() == "NA":
-                        na_counts[k] += 1
-        log.info("=== Statistiques NA par colonne (sur %d lignes) ===", total)
-        for k in keys:
-            cnt = na_counts.get(k, 0)
-            pct = (cnt / total) * 100 if total > 0 else 0.0
-            log.info("Colonne %s : %d NA (%.2f%%)", k, cnt, pct)
-
-    # Insertion Scylla
-    cluster = _get_cluster()
-    session = cluster.connect("gdelt")
-    try:
-        for msg in result:
-            insertion_scylla(session, msg)
-        log.info("Ingest terminé : %d articles insérés.", len(result))
-        # Commit des offsets Kafka uniquement après insertion réussie → pas de double ingestion
-        consumer.commit()
-        log.info("Offsets Kafka commités (groupe %s).", KAFKA_GROUP_ID)
-    except Exception:
-        log.exception("Erreur lors de l'insertion, offsets Kafka NON commités (relecture au prochain run).")
-        raise
-    finally:
-        session.shutdown()
-        cluster.shutdown()
-        consumer.close()
 
 def to_list_or_none_WOW(s):
     """Convertit une chaîne 'a;b;c' en liste ['a','b','c'], ou None si vide."""
@@ -666,25 +559,12 @@ def insertion_scylla(session, msg: dict) -> None:
 
 
 def task_parse_messages(**context):
-    """Tâche Airflow : récupère les messages Kafka via XCom, parse chaque ligne, renvoie la liste des dicts (+ offsets pour commit)."""
+    """Tâche Airflow : récupère les messages Kafka via XCom, parse chaque ligne, renvoie la liste des dicts."""
     ti = context["ti"]
-    data = ti.xcom_pull(task_ids="read_kafka_for_scylla")
-
-    if data is None:
-        log.info("Aucun message à parser (XCom vide).")
-        return {"parsed": [], "offsets": []}
-
-    if isinstance(data, dict):
-        messages = data.get("messages", [])
-        offsets = data.get("offsets", [])
-    else:
-        messages = data if isinstance(data, list) else []
-        offsets = []
-
+    messages = ti.xcom_pull(task_ids="read_kafka_for_scylla")
     if not messages:
-        log.info("Aucun message à parser.")
-        return {"parsed": [], "offsets": offsets}
-
+        log.info("Aucun message à parser (XCom vide).")
+        return []
     # Debug léger : on log uniquement V2GCAM pour quelques premières lignes
     for i, raw in enumerate(messages[:3]):
         parts = raw.split("\t")
@@ -731,59 +611,22 @@ def task_parse_messages(**context):
             pct = (cnt / total) * 100 if total > 0 else 0.0
             log.info("Colonne %s : %d NA (%.2f%%)", k, cnt, pct)
 
-    return {"parsed": result, "offsets": offsets}
+    return result
 
 
 def task_insert_to_scylla(**context):
-    """Tâche Airflow : récupère la liste des dicts parsés via XCom, insère en Scylla, puis commit les offsets Kafka (pas de double ingestion)."""
+    """Tâche Airflow : récupère la liste des dicts parsés via XCom, se connecte à Scylla, insère chaque article."""
     ti = context["ti"]
-    data = ti.xcom_pull(task_ids="my_process_data")
-
-    if data is None:
-        log.info("Aucun message à insérer.")
-        return
-
-    if isinstance(data, dict):
-        parsed_list = data.get("parsed", [])
-        offsets_serializable = data.get("offsets", [])
-    else:
-        parsed_list = data if isinstance(data, list) else []
-        offsets_serializable = []
-
+    parsed_list = ti.xcom_pull(task_ids="my_process_data")
     if not parsed_list:
         log.info("Aucun message à insérer.")
         return
-
     cluster = _get_cluster()
     session = cluster.connect("gdelt")
     try:
         for msg in parsed_list:
             insertion_scylla(session, msg)
         log.info("Ingest terminé : %d articles insérés.", len(parsed_list))
-
-        # Commit des offsets Kafka uniquement après insertion réussie
-        if offsets_serializable:
-            from kafka import KafkaConsumer
-            from kafka.structs import TopicPartition, OffsetAndMetadata
-
-            consumer = KafkaConsumer(
-                KAFKA_TOPIC,
-                bootstrap_servers=KAFKA_BOOTSTRAP,
-                group_id=KAFKA_GROUP_ID,
-                enable_auto_commit=False,
-            )
-            try:
-                offsets_map = {
-                    TopicPartition(o["topic"], o["partition"]): OffsetAndMetadata(o["offset"], "")
-                    for o in offsets_serializable
-                }
-                consumer.commit(offsets=offsets_map)
-                log.info("Offsets Kafka commités (groupe %s).", KAFKA_GROUP_ID)
-            finally:
-                consumer.close()
-    except Exception:
-        log.exception("Erreur lors de l'insertion, offsets Kafka NON commités (relecture au prochain run).")
-        raise
     finally:
         session.shutdown()
         cluster.shutdown()
