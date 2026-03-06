@@ -422,9 +422,9 @@ def my_process_data(raw: str) -> dict | None:
     raw_date = safe_get(parts, 1)
     date_human = transform_date(raw_date) if raw_date else "0000-01-01 00:00:00"
 
-    raw_tone = safe_get(parts, 12)
+    raw_tone = safe_get(parts, 15)
     tone = transform_v15tone(raw_tone) if raw_tone else " "
-    log.info("Tone brut (col 12 Kafka) = %r -> interprété = %s", raw_tone, tone)
+    log.info("Tone brut (col 15 Kafka) = %r -> interprété = %s", raw_tone, tone)
 
     raw_dates = safe_get(parts, 16)
     dates_dt = transform_v2dates(raw_dates) if raw_dates else " "
